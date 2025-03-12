@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Bodycam" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item> <!-- 讓頂部狀態欄位消失 -->
+    </style>
+</resources>
