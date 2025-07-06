@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -69,6 +70,10 @@ import com.jewer.bodycam.services.ScreenRecordService
 import com.jewer.bodycam.services.ScreenRecordService.Companion.KEY_RECORDING_CONFIG
 import com.jewer.bodycam.services.ScreenRecordService.Companion.START_RECORDING
 import com.jewer.bodycam.services.ScreenRecordService.Companion.STOP_RECORDING
+import com.jewer.bodycam.ui.theme.Black
+import com.jewer.bodycam.ui.theme.DarkYellow
+import com.jewer.bodycam.ui.theme.Red
+import com.jewer.bodycam.ui.theme.White
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 
@@ -97,7 +102,7 @@ fun CameraScreen(
     val personDetectApproved = getPersonDetectStatus(context)
 
     // 拿取相機供應
-    var cameraProviderFuture = remember {
+    val cameraProviderFuture = remember {
         ProcessCameraProvider.getInstance(context)
     }
 
@@ -136,7 +141,7 @@ fun CameraScreen(
     }
 
     // 相機預覽畫面
-    var previewView : PreviewView = remember {
+    val previewView : PreviewView = remember {
         PreviewView(context)
     }
 
@@ -316,10 +321,8 @@ fun CameraScreen(
         }
 
         // 停止錄影時錄影中 Icon 消失
-        if (!isServiceRunning) {
-            recordIconIsVisible = false // 錄影中 Icon 旗標關閉
-            standByStringIsVisible = true // 待機模式旗標開啟
-        }
+        recordIconIsVisible = false // 錄影中 Icon 旗標關閉
+        standByStringIsVisible = true // 待機模式旗標開啟
     }
 
     // 工具列點擊後出現(維持3秒)
@@ -379,10 +382,10 @@ fun CameraScreen(
                     text = userName + "   " +
                             currentTime.value + "\n" +
                             getPhoneName(),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = Color(White.value),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         shadow = Shadow(
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = Color(Black.value),
                             offset = Offset(3f, 3f),
                             blurRadius = 5f
                         )
@@ -411,7 +414,7 @@ fun CameraScreen(
                     // Icon浮水印錄影按鈕
                     Icon(
                         painter = painterResource(R.mipmap.ic_water_mark_foreground),
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = Color(DarkYellow.value),
                         contentDescription = "WaterMark",
                         modifier = Modifier
                             .size(96.dp)
@@ -459,7 +462,7 @@ fun CameraScreen(
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_settings_foreground),
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(White.value),
                                 contentDescription = "Settings",
                                 modifier = Modifier.size(72.dp)
                             )
@@ -477,7 +480,7 @@ fun CameraScreen(
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.ic_camera_switch_foreground),
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(White.value),
                                 contentDescription = "Switch Camera",
                                 modifier = Modifier.size(72.dp)
                             )
@@ -497,7 +500,7 @@ fun CameraScreen(
             if (recordIconIsVisible) {
                 Icon(
                     painter = painterResource(R.mipmap.ic_recording_foreground),
-                    tint = MaterialTheme.colorScheme.tertiary,
+                    tint = Color(Red.value),
                     contentDescription = "REC Icon",
                     modifier = Modifier
                         .graphicsLayer(rotationZ = 90f)
@@ -506,7 +509,7 @@ fun CameraScreen(
             } else if (standByStringIsVisible) {
                 Icon(
                     painter = painterResource(R.drawable.ic_start_record_foreground),
-                    tint = MaterialTheme.colorScheme.secondary,
+                    tint = Color(DarkYellow.value),
                     contentDescription = "Stand By Icon",
                     modifier = Modifier
                         .graphicsLayer(rotationZ = 90f)
@@ -523,12 +526,12 @@ fun CameraScreen(
         ) {
             Text(
                 text = currentBatteryLevel.intValue.toString() + "%",
-                color = if (currentBatteryLevel.intValue <= 50) MaterialTheme.colorScheme.secondary
-                else if (currentBatteryLevel.intValue <= 20) MaterialTheme.colorScheme.tertiary
-                else MaterialTheme.colorScheme.primary,
+                color = if (currentBatteryLevel.intValue <= 50) Color(DarkYellow.value)
+                else if (currentBatteryLevel.intValue <= 20) Color(Red.value)
+                else Color(White.value),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     shadow = Shadow(
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color(Black.value),
                         offset = Offset(3f, 3f),
                         blurRadius = 5f
                     )

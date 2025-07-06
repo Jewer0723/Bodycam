@@ -23,14 +23,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.google.mediapipe.tasks.vision.objectdetector.ObjectDetectorResult
 import com.jewer.bodycam.functions.getVibrateStatus
 import com.jewer.bodycam.functions.vibrateOnce
-import kotlin.collections.first
+import com.jewer.bodycam.ui.theme.DarkYellow
 
 // This composable is used to display the results of the object detection
 
@@ -93,7 +93,7 @@ fun ResultsOverlay(
                     ) {
                         Box(
                             modifier = Modifier
-                                .border(3.dp, MaterialTheme.colorScheme.secondary)
+                                .border(3.dp, Color(DarkYellow.value))
                                 .width(boxWidth.dp)
                                 .height(boxHeight.dp)
                         )

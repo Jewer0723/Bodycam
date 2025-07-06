@@ -13,7 +13,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -40,6 +39,9 @@ import com.jewer.bodycam.functions.getVibrateStatus
 import com.jewer.bodycam.functions.updatePersonDetectStatus
 import com.jewer.bodycam.functions.updateUserName
 import com.jewer.bodycam.functions.updateVibrateStatus
+import com.jewer.bodycam.ui.theme.DarkYellow
+import com.jewer.bodycam.ui.theme.Gray
+import com.jewer.bodycam.ui.theme.White
 
 @Composable
 fun SettingScreen(
@@ -53,17 +55,17 @@ fun SettingScreen(
     }
 
     // 重新命名對話框控制
-    var reName = remember {
+    val reName = remember {
         mutableStateOf(false)
     }
 
     // 讀取人體辨識滑塊狀態
-    var isPersonDetectChecked = remember {
+    val isPersonDetectChecked = remember {
         mutableStateOf(getPersonDetectStatus(context))
     }
 
     // 讀取震動滑塊狀態
-    var isVibrateChecked = remember {
+    val isVibrateChecked = remember {
         mutableStateOf(getVibrateStatus(context))
     }
 
@@ -120,7 +122,8 @@ fun SettingScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back to cameraScreen",
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = 8.dp),
+                        tint = Color(White.value)
                     )
                 }
 
@@ -128,7 +131,8 @@ fun SettingScreen(
                 Text(
                     text = userName.value,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    color = Color(White.value)
                 )
 
                 // 重新命名按鈕
@@ -141,7 +145,7 @@ fun SettingScreen(
                         painter = painterResource(id = R.drawable.ic_modify_user_name_foreground),
                         contentDescription = "modify_user_name_foreground",
                         modifier = Modifier.padding(end = 8.dp),
-                        tint = MaterialTheme.colorScheme.secondary
+                        tint = Color(DarkYellow.value)
                     )
                 }
             }
@@ -167,7 +171,8 @@ fun SettingScreen(
                     Text(
                         text = "Person Detect",
                         textAlign = TextAlign.Start,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        color = Color(White.value)
                     )
 
                     // 選項設定滑塊
@@ -178,10 +183,10 @@ fun SettingScreen(
                             updatePersonDetectStatus(context, isPersonDetectChecked.value)
                         },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            uncheckedThumbColor = Color.White,
-                            checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                            uncheckedTrackColor = Color.Gray
+                            checkedThumbColor = Color(White.value),
+                            uncheckedThumbColor = Color(White.value),
+                            checkedTrackColor = Color(DarkYellow.value),
+                            uncheckedTrackColor = Color(Gray.value)
                         )
                     )
                 }
@@ -205,7 +210,8 @@ fun SettingScreen(
                     Text(
                         text = "Vibrate When Person Detected",
                         textAlign = TextAlign.Start,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        color = Color(White.value)
                     )
 
                     // 選項設定滑塊
@@ -216,10 +222,10 @@ fun SettingScreen(
                             updateVibrateStatus(context, isVibrateChecked.value)
                         },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            uncheckedThumbColor = Color.White,
-                            checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                            uncheckedTrackColor = Color.Gray
+                            checkedThumbColor = Color(White.value),
+                            uncheckedThumbColor = Color(White.value),
+                            checkedTrackColor = Color(DarkYellow.value),
+                            uncheckedTrackColor = Color(Gray.value)
                         )
                     )
                 }

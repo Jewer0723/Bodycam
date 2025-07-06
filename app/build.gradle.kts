@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.jewer.bodycam"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 8
-        versionName = "1.1.7"
+        targetSdk = 36
+        versionCode = 9
+        versionName = "1.1.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
