@@ -13,8 +13,8 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.1.8"
+        versionCode = 17
+        versionName = "1.1.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -25,7 +25,6 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -35,9 +34,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
     }
     buildFeatures {
         compose = true
@@ -49,11 +45,14 @@ android {
     }
 }
 
-dependencies {
-    // WebRTC 相關庫
-    implementation (libs.google.webrtc)
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
+}
 
-    // 相機相關庫
+dependencies {
+    // camera library
     implementation (libs.google.accompanist.permissions)
     implementation (libs.androidx.camera.camera2)
     implementation (libs.androidx.camera.core.v110)
@@ -62,13 +61,10 @@ dependencies {
     implementation (libs.androidx.camera.extensions)
     implementation (libs.androidx.camera.video)
 
-    // 影音庫相關庫
-    implementation (libs.androidx.media)
-
-    // mediapipe相關庫
+    // mediapipe library
     implementation (libs.tasks.vision)
 
-    // 系統相關庫
+    // system library
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

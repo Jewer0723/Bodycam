@@ -9,6 +9,9 @@
     <!-- 麥克風授權 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
+    <!-- 喇叭授權 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!-- 螢幕錄影授權 -->
     <uses-permission android:name="android.permission.CAPTURE_VIDEO_OUTPUT"
         tools:ignore="ProtectedPermissions" />
@@ -34,7 +37,7 @@
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
-            android:screenOrientation="portrait"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="true"
             android:theme="@style/Theme.Bodycam"
@@ -47,7 +50,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".services.ScreenRecordService"
+            android:name=".backend.services.ScreenRecordService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaProjection">
