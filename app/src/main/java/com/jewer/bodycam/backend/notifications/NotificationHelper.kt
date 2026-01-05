@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import com.jewer.bodycam.MainActivity
 import com.jewer.bodycam.R
+import com.jewer.bodycam.backend.functions.getBodycamBrand
 
 object NotificationHelper {
 
@@ -23,7 +24,12 @@ object NotificationHelper {
             context, 0, intent, PendingIntent.FLAG_IMMUTABLE
         )
         val notifyTitle = "Recording..."
-        val notifyText = "Tap top right “Bodycam” icon to stop recording"
+        val notifyText = when(getBodycamBrand(context)) {
+            "AXON" -> "Tap top right “AXON” icon to stop recording"
+            "MOTOROLA" -> "Tap top left “MOTOROLA” icon to stop recording"
+            "TRANSCEND" -> "Tap bottom left “TRANSCEND” icon to stop recording"
+            else -> "Tap the icon to stop recording"
+        }
 
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(notifyTitle)

@@ -63,7 +63,8 @@ fun SettingScreen(
 
     val bodycamBrand = listOf(
         "AXON",
-        "Motorola"
+        "MOTOROLA",
+        "TRANSCEND"
     )
 
     LaunchedEffect(userName, isPersonDetectChecked, isVibrateChecked) { // 儲存狀態
@@ -76,7 +77,9 @@ fun SettingScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(
-            modifier = Modifier.padding(top = 50.dp, start = 16.dp)
+            modifier = Modifier
+                .padding(top = 50.dp, start = 16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             // 返回按鈕、使用者名稱和重新命名按鈕
             Row(
@@ -217,7 +220,7 @@ fun SettingScreen(
                 ) {
                     // 選項名稱
                     Text(
-                        text = "Beep Regularly After Record Start",
+                        text = "Beep Sound",
                         textAlign = TextAlign.Start,
                         modifier = Modifier.weight(1f),
                         color = White

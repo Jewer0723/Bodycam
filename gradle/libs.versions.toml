@@ -2,14 +2,14 @@
 accompanistPermissionsVersion = "0.37.3"
 agp = "8.13.2"
 cameraVideoVersion = "1.5.2"
-kotlin = "2.2.21"
+kotlin = "2.3.0"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.1"
-composeBom = "2025.12.00"
+activityCompose = "1.12.2"
+composeBom = "2025.12.01"
 navigationCompose = "2.9.6"
 tasksVision = "0.10.26.1" # 不要動
 cameraCoreVersion = "1.5.2"
@@ -19,10 +19,10 @@ lifecycleProcessVersion = "2.10.0"
 androidx-camera-extensions = { module = "androidx.camera:camera-extensions", version.ref = "cameraVideoVersion" }
 androidx-camera-video = { module = "androidx.camera:camera-video", version.ref = "cameraVideoVersion" }
 google-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissionsVersion" }
-androidx-camera-camera2 = { module = "androidx.camera:camera-camera2" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version = "1.5.2" }
 androidx-camera-core-v110 = { module = "androidx.camera:camera-core", version.ref = "cameraCoreVersion" }
-androidx-camera-view = { module = "androidx.camera:camera-view" }
-androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version = "1.5.2" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version = "1.5.2" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit"}
@@ -35,7 +35,7 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.10.0" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 tasks-vision = { module = "com.google.mediapipe:tasks-vision", version.ref = "tasksVision" }

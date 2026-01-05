@@ -77,6 +77,24 @@ fun getBeepSoundStatus(context: Context): Boolean {
 
 /**********************************************************************************************************/
 
+// 更新說明書對話框顯示布林狀態
+fun updateInstructionAlertDialogStatus(context: Context, isEnabled: Boolean) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putBoolean("instruction", isEnabled)
+    }
+}
+
+// 讀取說明書對話框布林狀態
+fun getInstructionAlertDialogStatus(context: Context): Boolean {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getBoolean("instruction", true)
+}
+
+/******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
 // 更新密錄器品牌
 fun updateBodycamBrand(context: Context, brand: String) {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)

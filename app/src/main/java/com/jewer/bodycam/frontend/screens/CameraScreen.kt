@@ -26,11 +26,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,10 +69,12 @@ import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getCurrentBatteryLevel
 import com.jewer.bodycam.backend.functions.getCurrentTime
+import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
+import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.vibrateOnce
 import com.jewer.bodycam.backend.objectdetector.ObjectDetectorHelper
 import com.jewer.bodycam.backend.objectdetector.ObjectDetectorListener
@@ -79,6 +86,8 @@ import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.START_RE
 import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.STOP_RECORDING
 import com.jewer.bodycam.frontend.nav.NAV
 import com.jewer.bodycam.ui.theme.Black
+import com.jewer.bodycam.ui.theme.DarkOrange
+import com.jewer.bodycam.ui.theme.DarkRed
 import com.jewer.bodycam.ui.theme.DarkYellow
 import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
@@ -97,10 +106,12 @@ fun CameraScreen(
     val userName = getUserName(context) // 讀取使用者名稱
     val personDetectApproved = getPersonDetectStatus(context) // 人體辨識授權
     val beepSoundApproved = getBeepSoundStatus(context) // 嗶聲授權
+    val instructionAlertDialogApproved = getInstructionAlertDialogStatus(context) // 說明書顯示授權
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) } // 拿取相機供應
     var recordIconIsVisible by remember { mutableStateOf(false) } // 錄影 icon 可見控制
     var standByStringIsVisible by remember { mutableStateOf(false) } // 待機模式字串可見控制
     var toolBoxIsVisible by remember { mutableStateOf(false) } // 工具列可見控制
+    var instructionAlertDialogIsVisible by remember { mutableStateOf(true) } // 使用手冊可見控制
     var cameraSelector by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) } // 相機選擇控制
     val previewView : PreviewView = remember { PreviewView(context) } // 相機預覽畫面
     var results by remember { mutableStateOf<ObjectDetectorResult?>(null) } // 影像辨識結果保持
@@ -229,9 +240,9 @@ fun CameraScreen(
     LaunchedEffect(isServiceRunning) {
         while(isServiceRunning) {
             if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
-                playSoundAtMaxVolume(context, R.raw.axonbeepsound)
+                playSoundAtMaxVolume(context, R.raw.axonrecordingsound)
             }
-            for (i in 0..1) {
+            repeat(2) {
                 vibrateOnce(context, 300)
                 delay(400)
             }
@@ -304,6 +315,10 @@ fun CameraScreen(
                                     it.action = STOP_RECORDING
                                     context.startForegroundService(it)
                                 }
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
                             } else {
                                 screenRecordLauncher.launch(
                                     mediaProjectionManager.createScreenCaptureIntent()
@@ -356,6 +371,10 @@ fun CameraScreen(
                             modifier = Modifier.size(72.dp),
                             onClick = {
                                 navController.navigate(NAV.SETTING)
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
                             }
                         ) {
                             Icon(
@@ -379,6 +398,10 @@ fun CameraScreen(
                                     if (cameraSelector == CameraSelector.LENS_FACING_BACK)
                                         CameraSelector.LENS_FACING_FRONT
                                     else CameraSelector.LENS_FACING_BACK
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
                             }
                         ) {
                             Icon(
@@ -411,7 +434,7 @@ fun CameraScreen(
             }
         }
 
-        "Motorola" -> {
+        "MOTOROLA" -> {
             Box( // 相機預覽畫面box
                 modifier = Modifier
                     .fillMaxSize()
@@ -459,6 +482,10 @@ fun CameraScreen(
                                         it.action = STOP_RECORDING
                                         context.startForegroundService(it)
                                     }
+                                    if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                        playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
+                                    }
+                                    vibrateOnce(context, 1000) // 震動 1 秒
                                 } else {
                                     screenRecordLauncher.launch(
                                         mediaProjectionManager.createScreenCaptureIntent()
@@ -571,6 +598,10 @@ fun CameraScreen(
                             modifier = Modifier.size(72.dp),
                             onClick = {
                                 navController.navigate(NAV.SETTING)
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
                             }
                         ) {
                             Icon(
@@ -594,6 +625,10 @@ fun CameraScreen(
                                     if (cameraSelector == CameraSelector.LENS_FACING_BACK)
                                         CameraSelector.LENS_FACING_FRONT
                                     else CameraSelector.LENS_FACING_BACK
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
                             }
                         ) {
                             Icon(
@@ -625,6 +660,243 @@ fun CameraScreen(
                 )
             }
         }
+
+        "TRANSCEND" -> {
+            Box( // 相機預覽畫面box
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { // 點擊範圍為全螢幕
+                        detectTapGestures(
+                            onTap = {
+                                toolBoxIsVisible = !toolBoxIsVisible
+                                if (!isServiceRunning) {
+                                    Toast.makeText(
+                                        context,
+                                        "Tap bottom left “TRANSCEND” icon to start/stop recording",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        )
+                    }
+            ) {
+                AndroidView(
+                    //相機預覽畫面
+                    factory = {
+                        previewView
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                Row(
+                    modifier = Modifier.align(Alignment.BottomStart),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        modifier = Modifier.size(96.dp),
+                        onClick = {
+                            if (isServiceRunning) { // 如果正在錄影，則停止錄影
+                                Intent(
+                                    context.applicationContext,
+                                    ScreenRecordService::class.java
+                                ).also {
+                                    it.action = STOP_RECORDING
+                                    context.startForegroundService(it)
+                                }
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
+                            } else {
+                                screenRecordLauncher.launch(
+                                    mediaProjectionManager.createScreenCaptureIntent()
+                                )
+                            }
+                        }
+                    ) {
+                        Icon( // Icon浮水印錄影按鈕
+                            painter = painterResource(R.mipmap.ic_transcend_icon_foreground),
+                            tint = DarkRed,
+                            contentDescription = "WaterMark",
+                            modifier = Modifier.size(96.dp)
+                        )
+                    }
+
+                    Text( // 時間浮水印、手機型號資訊
+                        text =  userName + "\n" +
+                                currentTime.value + " " + getPhoneName(),
+                        color = DarkOrange,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            shadow = Shadow(
+                                color = Black,
+                                offset = Offset(3f, 3f),
+                                blurRadius = 5f
+                            )
+                        )
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 10.dp, top = 10.dp)
+                ) {
+                    if (recordIconIsVisible) { // 錄影中 icon 、待機模式 icon box，顯示錄影中 icon (每秒閃一次)
+                        Icon(
+                            painter = painterResource(R.mipmap.ic_recording_foreground),
+                            tint = Red,
+                            contentDescription = "REC Icon",
+                            modifier = Modifier.size(48.dp)
+                        )
+                    } else if (standByStringIsVisible) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_start_record_foreground),
+                            tint = DarkYellow,
+                            contentDescription = "Stand By Icon",
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 10.dp)
+                ) {
+                    AnimatedVisibility( // 點擊後出現工具列 (漸入漸出)
+                        visible = toolBoxIsVisible,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        IconButton( // 設定按鈕
+                            modifier = Modifier.size(72.dp),
+                            onClick = {
+                                navController.navigate(NAV.SETTING)
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_settings_foreground),
+                                tint = White,
+                                contentDescription = "Settings",
+                                modifier = Modifier.size(72.dp)
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility( // 點擊後出現工具列 (漸入漸出)
+                        visible = toolBoxIsVisible,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        IconButton( // 相機切換按鈕
+                            modifier = Modifier.size(72.dp),
+                            onClick = {
+                                cameraSelector =
+                                    if (cameraSelector == CameraSelector.LENS_FACING_BACK)
+                                        CameraSelector.LENS_FACING_FRONT
+                                    else CameraSelector.LENS_FACING_BACK
+                                if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
+                                }
+                                vibrateOnce(context, 1000) // 震動 1 秒
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_camera_switch_foreground),
+                                tint = White,
+                                contentDescription = "Switch Camera",
+                                modifier = Modifier.size(72.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text( // 顯示電量
+                    text = currentBatteryLevel.intValue.toString() + "%",
+                    color = if (currentBatteryLevel.intValue <= 50) DarkYellow
+                    else if (currentBatteryLevel.intValue <= 20) Red
+                    else White,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        shadow = Shadow(
+                            color = Black,
+                            offset = Offset(3f, 3f),
+                            blurRadius = 5f
+                        )
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 10.dp, bottom = 10.dp)
+                        .size(48.dp)
+                )
+            }
+        }
+    }
+
+    // 使用手冊對話框
+    if (instructionAlertDialogApproved && instructionAlertDialogIsVisible) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = {
+                Text(text = "Instruction", color = White)
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    SelectionContainer{
+                        Text(
+                            text =  "●  AXON : Tap top right “AXON” icon to start/stop recording.\n" +
+                                    "\n" +
+                                    "●  MOTOROLA : Tap top left “MOTOROLA” icon to start/stop recording.\n" +
+                                    "\n" +
+                                    "●  TRANSCEND : Tap bottom left “TRANSCEND” icon to start/stop recording.\n" +
+                                    "\n" +
+                                    "●  Record result will be stored in “Bodycam” folder in device media store space.\n" +
+                                    "\n" +
+                                    "●  For android 14+ device, you can chose to record “A single app” or “Entire screen”.\n" +
+                                    "\n" +
+                                    "●  Tap the screen then “settings” and “camera change” will show on the left side of screen.\n" +
+                                    "\n" +
+                                    "●  Tap the screen then “record instruction” will show on the screen again.\n" +
+                                    "\n" +
+                                    "●  User name can be changed.",
+                            color = White
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        instructionAlertDialogIsVisible = false // 關閉此對話框
+                    }
+                ) {
+                    Text(
+                        color = DarkYellow,
+                        text = "close"
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        instructionAlertDialogIsVisible = false // 關閉此對話框
+                        updateInstructionAlertDialogStatus(context, false) // 永久關閉此對話框
+                    }
+                ) {
+                    Text(
+                        color = DarkYellow,
+                        text = "close and do not show again"
+                    )
+                }
+            }
+        )
     }
 
     // 物件方框繪製
