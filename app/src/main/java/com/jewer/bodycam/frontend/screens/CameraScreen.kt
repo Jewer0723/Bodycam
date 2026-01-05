@@ -73,6 +73,7 @@ import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
 import com.jewer.bodycam.backend.functions.getUserName
+import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.vibrateOnce
@@ -105,6 +106,7 @@ fun CameraScreen(
     val currentBatteryLevel = remember { mutableIntStateOf(getCurrentBatteryLevel(context)) } // 獲取現在手機電量
     val userName = getUserName(context) // 讀取使用者名稱
     val personDetectApproved = getPersonDetectStatus(context) // 人體辨識授權
+    val vibrateApproved = getVibrateStatus(context) // 震動狀態
     val beepSoundApproved = getBeepSoundStatus(context) // 嗶聲授權
     val instructionAlertDialogApproved = getInstructionAlertDialogStatus(context) // 說明書顯示授權
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) } // 拿取相機供應
@@ -242,9 +244,11 @@ fun CameraScreen(
             if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                 playSoundAtMaxVolume(context, R.raw.axonrecordingsound)
             }
-            repeat(2) {
-                vibrateOnce(context, 300)
-                delay(400)
+            if (vibrateApproved) { // 如果震動授權
+                repeat(2) {
+                    vibrateOnce(context, 300)
+                    delay(400)
+                }
             }
             delay(180000) // 每 3 分鐘更新一次
         }
@@ -318,7 +322,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             } else {
                                 screenRecordLauncher.launch(
                                     mediaProjectionManager.createScreenCaptureIntent()
@@ -374,7 +380,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(
@@ -401,7 +409,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(
@@ -485,7 +495,9 @@ fun CameraScreen(
                                     if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                         playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
                                     }
-                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                    if (vibrateApproved) { // 如果震動授權
+                                        vibrateOnce(context, 1000) // 震動 1 秒
+                                    }
                                 } else {
                                     screenRecordLauncher.launch(
                                         mediaProjectionManager.createScreenCaptureIntent()
@@ -601,7 +613,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(
@@ -628,7 +642,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(
@@ -706,7 +722,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             } else {
                                 screenRecordLauncher.launch(
                                     mediaProjectionManager.createScreenCaptureIntent()
@@ -775,7 +793,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(
@@ -802,7 +822,9 @@ fun CameraScreen(
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
-                                vibrateOnce(context, 1000) // 震動 1 秒
+                                if (vibrateApproved) { // 如果震動授權
+                                    vibrateOnce(context, 1000) // 震動 1 秒
+                                }
                             }
                         ) {
                             Icon(

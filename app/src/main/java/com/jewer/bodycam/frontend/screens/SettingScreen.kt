@@ -181,7 +181,7 @@ fun SettingScreen(
                 ) {
                     // 選項名稱
                     Text(
-                        text = "Vibrate When Person Detected",
+                        text = "Vibrate Effect",
                         textAlign = TextAlign.Start,
                         modifier = Modifier.weight(1f),
                         color = White
