@@ -13,8 +13,8 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 22
-        versionName = "1.1.22"
+        versionCode = 27
+        versionName = "1.1.27"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -55,7 +55,7 @@ dependencies {
     // camera library
     implementation (libs.google.accompanist.permissions)
     implementation (libs.androidx.camera.camera2)
-    implementation (libs.androidx.camera.core.v110)
+    implementation (libs.androidx.camera.core)
     implementation (libs.androidx.camera.lifecycle)
     implementation (libs.androidx.camera.view)
     implementation (libs.androidx.camera.extensions)

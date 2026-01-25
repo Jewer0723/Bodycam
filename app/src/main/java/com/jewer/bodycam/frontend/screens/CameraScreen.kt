@@ -73,6 +73,7 @@ import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
 import com.jewer.bodycam.backend.functions.getUserName
+import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
@@ -109,6 +110,8 @@ fun CameraScreen(
     val vibrateApproved = getVibrateStatus(context) // 震動狀態
     val beepSoundApproved = getBeepSoundStatus(context) // 嗶聲授權
     val instructionAlertDialogApproved = getInstructionAlertDialogStatus(context) // 說明書顯示授權
+    val chosenTimeInterval = getVibrateAndBeepTimeInterval(context) // 聲響/震動時間間隔
+    val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) } // 密錄器品牌
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) } // 拿取相機供應
     var recordIconIsVisible by remember { mutableStateOf(false) } // 錄影 icon 可見控制
     var standByStringIsVisible by remember { mutableStateOf(false) } // 待機模式字串可見控制
@@ -122,7 +125,6 @@ fun CameraScreen(
     var active by remember { mutableStateOf(true) } // 影像辨識啟動旗標
     val mediaProjectionManager by lazy { context.getSystemService<MediaProjectionManager>()!! } // 建立螢幕錄影管理者
     val isServiceRunning by ScreenRecordService.isServiceRunning.collectAsStateWithLifecycle() // 錄影狀態旗標 (連動 service 裡面的旗標)
-    val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
 
     val screenRecordLauncher = rememberLauncherForActivityResult( // 開始錄影之流程變數
         contract = ActivityResultContracts.StartActivityForResult()
@@ -177,17 +179,11 @@ fun CameraScreen(
                                 onResultsCallback = {
                                     frameHeight = it.inputImageHeight
                                     frameWidth = it.inputImageWidth
-
-                                    if (active) {
-                                        results = it.results.first()
-                                    }
+                                    if (active) { results = it.results.first() }
                                 }
                             )
                         )
-                    imageAnalyzer.setAnalyzer(
-                        backgroundExecutor,
-                        objectDetectorHelper::detectLivestreamFrame
-                    )
+                    imageAnalyzer.setAnalyzer(backgroundExecutor, objectDetectorHelper::detectLivestreamFrame)
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
@@ -238,7 +234,7 @@ fun CameraScreen(
         standByStringIsVisible = true // 待機模式旗標開啟
     }
 
-    // 每 3 分鐘震動及嗶聲兩次提醒使用者錄影中
+    // 每 2 分鐘震動及嗶聲兩次提醒使用者錄影中
     LaunchedEffect(isServiceRunning) {
         while(isServiceRunning) {
             if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
@@ -250,7 +246,7 @@ fun CameraScreen(
                     delay(400)
                 }
             }
-            delay(180000) // 每 3 分鐘更新一次
+            delay(chosenTimeInterval) // 根據選擇的時間間隔發出聲響/震動一次
         }
     }
 

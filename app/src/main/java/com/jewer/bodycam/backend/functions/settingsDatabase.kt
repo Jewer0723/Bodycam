@@ -77,6 +77,24 @@ fun getBeepSoundStatus(context: Context): Boolean {
 
 /**********************************************************************************************************/
 
+// 更新嗶聲/震動時間間隔
+fun updateVibrateAndBeepTimeInterval(context: Context, timeInterval: Long) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putLong("timeInterval", timeInterval)
+    }
+}
+
+// 讀取嗶聲/震動時間間隔
+fun getVibrateAndBeepTimeInterval(context: Context): Long {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getLong("timeInterval", 120000L)
+}
+
+/******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
 // 更新說明書對話框顯示布林狀態
 fun updateInstructionAlertDialogStatus(context: Context, isEnabled: Boolean) {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)

@@ -1,5 +1,6 @@
 package com.jewer.bodycam.frontend.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,8 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -37,11 +42,13 @@ import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getUserName
+import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
 import com.jewer.bodycam.backend.functions.updatePersonDetectStatus
 import com.jewer.bodycam.backend.functions.updateUserName
+import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.updateVibrateStatus
 import com.jewer.bodycam.frontend.nav.NAV
 import com.jewer.bodycam.ui.theme.DarkYellow
@@ -55,13 +62,35 @@ fun SettingScreen(
     val context = LocalContext.current
     val userName = remember { mutableStateOf(getUserName(context)) } // 讀取使用者名稱
     val reName = remember { mutableStateOf(false) } // 重新命名對話框控制
+    var timeIntervalExpand by remember { mutableStateOf(false) } // 聲響/震動聲響間隔下拉選單控制
     val brandChoose = remember { mutableStateOf(false) } // 品牌選擇對話框控制
     val isPersonDetectChecked = remember { mutableStateOf(getPersonDetectStatus(context)) } // 讀取人體辨識滑塊狀態
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) } // 讀取震動滑塊狀態
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) } // 讀取嗶聲滑塊狀態
-    val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
+    val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) } // 選擇的密錄器品牌
 
-    val bodycamBrand = listOf(
+    data class TimeInterval(
+        val displayText: String, // 用於顯示的文字
+        val intervalMillis: Long    // 實際的毫秒數
+    )
+    val timeIntervalOptions = listOf(
+        TimeInterval("0.5 min", 30000L),
+        TimeInterval("1 min", 60000L),
+        TimeInterval("1.5 min", 90000L),
+        TimeInterval("2 min", 120000L),
+        TimeInterval("3 min", 180000L),
+        TimeInterval("5 min", 300000L),
+        TimeInterval("10 min", 600000L),
+        TimeInterval("30 min", 1800000L),
+        TimeInterval("60 min", 3600000L)
+    )
+    val initialInterval = remember {
+        timeIntervalOptions.find { it.intervalMillis == getVibrateAndBeepTimeInterval(context) }
+            ?: timeIntervalOptions.find { it.intervalMillis == 120000L }!! // 如果找不到，使用預設的 "2 min"
+    }
+    var chosenTimeInterval by remember { mutableStateOf(initialInterval) } // 儲存整個物件
+
+    val bodycamBrand = listOf( // 密錄器品牌列表
         "AXON",
         "MOTOROLA",
         "TRANSCEND"
@@ -240,6 +269,53 @@ fun SettingScreen(
                             uncheckedTrackColor = Gray
                         )
                     )
+                }
+            }
+
+            // 嗶聲/震動間隔選擇
+            TextButton(
+                onClick = {
+                    timeIntervalExpand = !timeIntervalExpand
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 選項名稱
+                    Text(
+                        text = "Vibrate/Beep Sound Time Interval",
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.weight(1f),
+                        color = White
+                    )
+
+                    Text(
+                        text = chosenTimeInterval.displayText, // 直接從狀態物件中讀取 displayText
+                        color = DarkYellow
+                    )
+
+                    // 時間間隔下拉選單
+                    DropdownMenu(
+                        expanded = timeIntervalExpand,
+                        onDismissRequest = {
+                            timeIntervalExpand = false
+                        },
+                        modifier = Modifier.border(1.dp, White)
+                    ) {
+                        timeIntervalOptions.forEach { timeOption ->
+                            DropdownMenuItem(
+                                text = { Text(text = timeOption.displayText, color = White) },
+                                onClick = {
+                                    chosenTimeInterval = timeOption
+                                    updateVibrateAndBeepTimeInterval(context, timeOption.intervalMillis)
+                                    timeIntervalExpand = false
+                                })
+                        }
+                    }
                 }
             }
 

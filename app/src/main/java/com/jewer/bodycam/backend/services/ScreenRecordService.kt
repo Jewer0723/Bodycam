@@ -133,7 +133,7 @@ class ScreenRecordService: Service() {
 
         val contentValues = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, videoName) // 檔名
-            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4") // 存黨格式
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4") // 存檔格式
             put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/${getString(R.string.app_name)}") // 儲存相對路徑
         }
 
