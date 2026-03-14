@@ -38,6 +38,11 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {
@@ -48,7 +53,7 @@ kotlin {
 
 dependencies {
     // uvc camera library
-    implementation(libs.lib)
+    implementation(files("libs/lib-0.0.13-fixed.aar"))
 
     // camera library
     implementation (libs.google.accompanist.permissions)

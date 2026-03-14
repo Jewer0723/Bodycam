@@ -304,6 +304,12 @@ fun CameraScreen(
                 if (isServiceRunning) {
                     Intent(context.applicationContext, ScreenRecordService::class.java)
                         .also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                    if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                        playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
+                    }
+                    if (vibrateApproved) { // 如果震動授權
+                        vibrateOnce(context, 1000) // 震動 1 秒
+                    }
                 }
                 // 請求 USB 權限，授權後 onConnect 會自動啟動預覽
                 UsbCameraManager.requestPermission(UsbCameraManager.getUsbDevice())
@@ -313,6 +319,12 @@ fun CameraScreen(
                 if (isServiceRunning) {
                     Intent(context.applicationContext, ScreenRecordService::class.java)
                         .also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                    if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
+                        playSoundAtMaxVolume(context, R.raw.axonstoprecordsound) // 結束錄影聲響
+                    }
+                    if (vibrateApproved) { // 如果震動授權
+                        vibrateOnce(context, 1000) // 震動 1 秒
+                    }
                 }
             }
         )
