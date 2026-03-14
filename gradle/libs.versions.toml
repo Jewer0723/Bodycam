@@ -1,19 +1,21 @@
 [versions]
 accompanistPermissionsVersion = "0.37.3"
-agp = "9.0.0"
-cameraVideoVersion = "1.5.2"
-kotlin = "2.3.0"
-coreKtx = "1.17.0"
+agp = "9.1.0"
+cameraVideoVersion = "1.5.3"
+kotlin = "2.3.10"
+coreKtx = "1.18.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
+libVersion = "0.0.13"
 lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.2"
-composeBom = "2026.01.00"
-navigationCompose = "2.9.6"
+activityCompose = "1.13.0"
+composeBom = "2026.03.00"
+navigationCompose = "2.9.7"
 tasksVision = "0.10.26.1" # 不要動
-cameraCoreVersion = "1.5.2"
+cameraCoreVersion = "1.5.3"
 lifecycleProcessVersion = "2.10.0"
+uiTestManifest = "1.10.5"
 
 [libraries]
 androidx-camera-extensions = { module = "androidx.camera:camera-extensions", version.ref = "cameraVideoVersion" }
@@ -35,9 +37,10 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.10.1" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "uiTestManifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+lib = { module = "org.uvccamera:lib", version.ref = "libVersion" }
 tasks-vision = { module = "com.google.mediapipe:tasks-vision", version.ref = "tasksVision" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcessVersion" }
 

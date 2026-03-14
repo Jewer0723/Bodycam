@@ -13,8 +13,8 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
-        versionName = "1.1.27"
+        versionCode = 28
+        versionName = "1.1.28"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,11 +38,6 @@ android {
     buildFeatures {
         compose = true
     }
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
 }
 
 kotlin {
@@ -52,6 +47,9 @@ kotlin {
 }
 
 dependencies {
+    // uvc camera library
+    implementation(libs.lib)
+
     // camera library
     implementation (libs.google.accompanist.permissions)
     implementation (libs.androidx.camera.camera2)

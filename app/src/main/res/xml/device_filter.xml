@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 允許所有 UVC 裝置，不限 VID/PID -->
+    <usb-device />
+</resources>

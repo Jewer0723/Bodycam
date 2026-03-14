@@ -1,11 +1,17 @@
 package com.jewer.bodycam.frontend.screens
 
 import android.content.Intent
+import android.hardware.camera2.CameraCharacteristics
+import android.media.MediaRecorder
 import android.media.projection.MediaProjectionManager
 import android.util.Log
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -83,9 +89,11 @@ import com.jewer.bodycam.backend.objectdetector.ObjectDetectorListener
 import com.jewer.bodycam.backend.objectdetector.ResultsOverlay
 import com.jewer.bodycam.backend.services.ScreenRecordConfig
 import com.jewer.bodycam.backend.services.ScreenRecordService
+import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.KEY_AUDIO_SOURCE
 import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.KEY_RECORDING_CONFIG
 import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.START_RECORDING
 import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.STOP_RECORDING
+import com.jewer.bodycam.backend.usb.UsbCameraManager
 import com.jewer.bodycam.frontend.nav.NAV
 import com.jewer.bodycam.ui.theme.Black
 import com.jewer.bodycam.ui.theme.DarkOrange
@@ -96,6 +104,7 @@ import com.jewer.bodycam.ui.theme.White
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 
+@androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScreen(
@@ -117,7 +126,6 @@ fun CameraScreen(
     var standByStringIsVisible by remember { mutableStateOf(false) } // 待機模式字串可見控制
     var toolBoxIsVisible by remember { mutableStateOf(false) } // 工具列可見控制
     var instructionAlertDialogIsVisible by remember { mutableStateOf(true) } // 使用手冊可見控制
-    var cameraSelector by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) } // 相機選擇控制
     val previewView : PreviewView = remember { PreviewView(context) } // 相機預覽畫面
     var results by remember { mutableStateOf<ObjectDetectorResult?>(null) } // 影像辨識結果保持
     var frameHeight by remember { mutableIntStateOf(4) } // 畫面高度
@@ -125,6 +133,31 @@ fun CameraScreen(
     var active by remember { mutableStateOf(true) } // 影像辨識啟動旗標
     val mediaProjectionManager by lazy { context.getSystemService<MediaProjectionManager>()!! } // 建立螢幕錄影管理者
     val isServiceRunning by ScreenRecordService.isServiceRunning.collectAsStateWithLifecycle() // 錄影狀態旗標 (連動 service 裡面的旗標)
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var useUltraWide by remember { mutableStateOf(true) }
+    val cameraSelector = remember(lensFacing, useUltraWide) {
+        CameraSelector.Builder().addCameraFilter { cameraInfos ->
+            val filtered = cameraInfos.filter { it.lensFacing == lensFacing }
+
+            if (lensFacing == CameraSelector.LENS_FACING_BACK && useUltraWide) {
+                val wideLens = filtered.minByOrNull { cameraInfo ->
+                    val camera2Info = Camera2CameraInfo.from(cameraInfo)
+                    val focalLengths = camera2Info.getCameraCharacteristic(
+                        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
+                    )
+                    focalLengths?.minOrNull() ?: Float.MAX_VALUE
+                }
+                wideLens?.let { listOf(it) } ?: filtered
+            } else {
+                filtered
+            }
+        }.build()
+    }
+    val isUsbCameraConnected by UsbCameraManager.isUsbCameraConnected
+        .collectAsStateWithLifecycle()
+    val usbAudioSource by UsbCameraManager.usbAudioSource
+        .collectAsStateWithLifecycle()
+    val uvcSurfaceView = remember { SurfaceView(context) }
 
     val screenRecordLauncher = rememberLauncherForActivityResult( // 開始錄影之流程變數
         contract = ActivityResultContracts.StartActivityForResult()
@@ -141,6 +174,10 @@ fun CameraScreen(
         ).apply {
             this.action = START_RECORDING
             putExtra(KEY_RECORDING_CONFIG, config)
+            putExtra(
+                KEY_AUDIO_SOURCE,
+                usbAudioSource ?: MediaRecorder.AudioSource.CAMCORDER
+            )
         }
         context.startForegroundService(serviceIntent)
     }
@@ -158,12 +195,10 @@ fun CameraScreen(
                     it.surfaceProvider = previewView.surfaceProvider
                 }
 
-                val cameraSelector = CameraSelector.Builder()
-                    .requireLensFacing(cameraSelector)
-                    .build()
+                cameraProvider.unbindAll()
 
                 // 如果許可人體辨識，則執行辨識
-                if (personDetectApproved) {
+                val camera = if (personDetectApproved) {
                     val imageAnalyzer =
                         ImageAnalysis.Builder()
                             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
@@ -184,7 +219,7 @@ fun CameraScreen(
                             )
                         )
                     imageAnalyzer.setAnalyzer(backgroundExecutor, objectDetectorHelper::detectLivestreamFrame)
-                    cameraProvider.unbindAll()
+
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
@@ -192,24 +227,20 @@ fun CameraScreen(
                         preview
                     )
                 } else {
-                    cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
                         preview
                     )
                 }
+
+                val minZoom = camera.cameraInfo.zoomState.value?.minZoomRatio ?: 1.0f
+                camera.cameraControl.setZoomRatio(minZoom)// 設定廣角鏡頭
+
             } catch (e: Exception) {
                 Log.e("CameraPreview", "Error initializing camera", e)
             }
         }, executor)
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            active = false
-            cameraProviderFuture.get().unbindAll()
-        }
     }
 
     // 獲取實時時間和電量
@@ -258,6 +289,52 @@ fun CameraScreen(
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            active = false
+            cameraProviderFuture.get().unbindAll()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        UsbCameraManager.register(
+            context = context,
+            onAttached = {
+                // 插入時若正在錄影先停止
+                if (isServiceRunning) {
+                    Intent(context.applicationContext, ScreenRecordService::class.java)
+                        .also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                }
+                // 請求 USB 權限，授權後 onConnect 會自動啟動預覽
+                UsbCameraManager.requestPermission(UsbCameraManager.getUsbDevice())
+            },
+            onDetached = {
+                // 拔出時若正在錄影先停止
+                if (isServiceRunning) {
+                    Intent(context.applicationContext, ScreenRecordService::class.java)
+                        .also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                }
+            }
+        )
+        onDispose { UsbCameraManager.unregister() }
+    }
+
+    DisposableEffect(isUsbCameraConnected) {
+        if (isUsbCameraConnected) {
+            // 等 SurfaceView 的 Surface 建立完成後再傳入
+            uvcSurfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: SurfaceHolder) {
+                    UsbCameraManager.setPreviewSurface(holder.surface)
+                }
+                override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) {}
+                override fun surfaceDestroyed(holder: SurfaceHolder) {
+                    UsbCameraManager.setPreviewSurface(null)
+                }
+            })
+        }
+        onDispose {}
+    }
+
     when(chosenBrand.value) {
         "AXON" -> {
             Box( // 相機預覽畫面box
@@ -278,13 +355,19 @@ fun CameraScreen(
                         )
                     }
             ) {
-                AndroidView(
-                    //相機預覽畫面
-                    factory = {
-                        previewView
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                if (isUsbCameraConnected) {
+                    // USB 外接攝像頭預覽
+                    AndroidView(
+                        factory = { uvcSurfaceView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // 原本的手機鏡頭預覽（不動）
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Row(
                     modifier = Modifier.align(Alignment.TopEnd),
@@ -398,10 +481,13 @@ fun CameraScreen(
                         IconButton( // 相機切換按鈕
                             modifier = Modifier.size(72.dp),
                             onClick = {
-                                cameraSelector =
-                                    if (cameraSelector == CameraSelector.LENS_FACING_BACK)
-                                        CameraSelector.LENS_FACING_FRONT
-                                    else CameraSelector.LENS_FACING_BACK
+                                if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                                    lensFacing = CameraSelector.LENS_FACING_FRONT
+                                    useUltraWide = false
+                                } else {
+                                    lensFacing = CameraSelector.LENS_FACING_BACK
+                                    useUltraWide = true
+                                }
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
@@ -459,13 +545,19 @@ fun CameraScreen(
                         )
                     }
             ) {
-                AndroidView(
-                    //相機預覽畫面
-                    factory = {
-                        previewView
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                if (isUsbCameraConnected) {
+                    // USB 外接攝像頭預覽
+                    AndroidView(
+                        factory = { uvcSurfaceView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // 原本的手機鏡頭預覽（不動）
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Box(
                     modifier = Modifier
@@ -631,10 +723,13 @@ fun CameraScreen(
                         IconButton( // 相機切換按鈕
                             modifier = Modifier.size(72.dp),
                             onClick = {
-                                cameraSelector =
-                                    if (cameraSelector == CameraSelector.LENS_FACING_BACK)
-                                        CameraSelector.LENS_FACING_FRONT
-                                    else CameraSelector.LENS_FACING_BACK
+                                if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                                    lensFacing = CameraSelector.LENS_FACING_FRONT
+                                    useUltraWide = false
+                                } else {
+                                    lensFacing = CameraSelector.LENS_FACING_BACK
+                                    useUltraWide = true
+                                }
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
@@ -692,13 +787,19 @@ fun CameraScreen(
                         )
                     }
             ) {
-                AndroidView(
-                    //相機預覽畫面
-                    factory = {
-                        previewView
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                if (isUsbCameraConnected) {
+                    // USB 外接攝像頭預覽
+                    AndroidView(
+                        factory = { uvcSurfaceView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // 原本的手機鏡頭預覽（不動）
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Row(
                     modifier = Modifier.align(Alignment.BottomStart),
@@ -811,10 +912,13 @@ fun CameraScreen(
                         IconButton( // 相機切換按鈕
                             modifier = Modifier.size(72.dp),
                             onClick = {
-                                cameraSelector =
-                                    if (cameraSelector == CameraSelector.LENS_FACING_BACK)
-                                        CameraSelector.LENS_FACING_FRONT
-                                    else CameraSelector.LENS_FACING_BACK
+                                if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                                    lensFacing = CameraSelector.LENS_FACING_FRONT
+                                    useUltraWide = false
+                                } else {
+                                    lensFacing = CameraSelector.LENS_FACING_BACK
+                                    useUltraWide = true
+                                }
                                 if (beepSoundApproved) { // 如果嗶聲授權再發出聲響
                                     playSoundAtMaxVolume(context, R.raw.axonstartrecordsound) // 結束錄影聲響
                                 }
