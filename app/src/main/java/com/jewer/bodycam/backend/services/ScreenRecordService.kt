@@ -109,12 +109,7 @@ class ScreenRecordService: Service() {
         )
         mediaProjection?.registerCallback(mediaProjectionCallback, null)
 
-        val audioSource = intent.getIntExtra(
-            KEY_AUDIO_SOURCE,
-            MediaRecorder.AudioSource.CAMCORDER  // 預設值
-        )
-
-        initializeRecorder(audioSource) // 傳入音源
+        initializeRecorder()
         mediaRecorder.start()
 
         virtualDisplay = createVirtualDisplay()
@@ -132,9 +127,7 @@ class ScreenRecordService: Service() {
         stopSelf()
     }
 
-    private fun initializeRecorder(
-        audioSource: Int = MediaRecorder.AudioSource.CAMCORDER
-    ) {
+    private fun initializeRecorder() {
         val filenameFormat = "yyyy-MM-dd-HH-mm-ss" // 檔名格式
         val videoName = SimpleDateFormat(filenameFormat, Locale.US).format(System.currentTimeMillis()) + ".mp4" // 建立檔名
 
@@ -158,7 +151,7 @@ class ScreenRecordService: Service() {
             ?: throw FileNotFoundException("Failed to open file descriptor for URI: $videoUri")
 
         with(mediaRecorder) {
-            setAudioSource(audioSource)
+            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setOutputFile(pfd.fileDescriptor)
@@ -205,7 +198,6 @@ class ScreenRecordService: Service() {
         private val _isServiceRunning = MutableStateFlow(false)
         val isServiceRunning = _isServiceRunning.asStateFlow()
 
-        const val KEY_AUDIO_SOURCE = "KEY_AUDIO_SOURCE"
         const val START_RECORDING = "START_RECORDING"
         const val STOP_RECORDING = "STOP_RECORDING"
         const val KEY_RECORDING_CONFIG = "KEY_RECORDING_CONFIG"

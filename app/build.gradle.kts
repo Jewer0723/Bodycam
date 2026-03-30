@@ -52,9 +52,6 @@ kotlin {
 }
 
 dependencies {
-    // uvc camera library
-    implementation(files("libs/lib-0.0.13-fixed.aar"))
-
     // camera library
     implementation (libs.google.accompanist.permissions)
     implementation (libs.androidx.camera.camera2)
