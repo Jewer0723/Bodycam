@@ -116,7 +116,11 @@ class ScreenRecordService: Service() {
     }
 
     private fun stopRecording() {
-        mediaRecorder.stop()
+        try {
+            mediaRecorder.stop()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         mediaProjection?.stop()
         mediaRecorder.reset()
     }
@@ -150,26 +154,32 @@ class ScreenRecordService: Service() {
         val pfd = contentResolver.openFileDescriptor(videoUri, "rw")
             ?: throw FileNotFoundException("Failed to open file descriptor for URI: $videoUri")
 
+        // 獲取裝置螢幕解析度
+        val metrics = resources.displayMetrics
+        val width = metrics.widthPixels
+        val height = metrics.heightPixels
+
         with(mediaRecorder) {
             setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setOutputFile(pfd.fileDescriptor)
-            setVideoSize(886, 1920)
+            setVideoSize(width, height)
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             setAudioEncoder(MediaRecorder.AudioEncoder.AMR_WB)
-            setVideoEncodingBitRate(3840 * 2160)
+            setVideoEncodingBitRate(6 * 1024 * 1024) // 設定為 6 Mbps 以維持畫質
             setVideoFrameRate(30)
             prepare()
         }
     }
 
     private fun createVirtualDisplay(): VirtualDisplay? {
+        val metrics = resources.displayMetrics
         return mediaProjection?.createVirtualDisplay(
             "Screen",
-            886,
-            1920,
-            resources.displayMetrics.densityDpi,
+            metrics.widthPixels,
+            metrics.heightPixels,
+            metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             mediaRecorder.surface,
             null,

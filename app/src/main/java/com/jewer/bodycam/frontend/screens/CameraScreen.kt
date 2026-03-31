@@ -72,13 +72,17 @@ import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getCurrentBatteryLevel
 import com.jewer.bodycam.backend.functions.getCurrentTime
+import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
+import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
+import com.jewer.bodycam.backend.functions.setFlashlight
+import com.jewer.bodycam.backend.functions.setScreenBrightness
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.vibrateOnce
 import com.jewer.bodycam.backend.objectdetector.ObjectDetectorHelper
@@ -115,6 +119,9 @@ fun CameraScreen(
     val beepSoundApproved = getBeepSoundStatus(context)
     val instructionAlertDialogApproved = getInstructionAlertDialogStatus(context)
     val chosenTimeInterval = getVibrateAndBeepTimeInterval(context)
+    val isLowBrightnessApproved = getLowBrightnessStatus(context)
+    val isFlashlightApproved = getFlashlightStatus(context)
+    
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var recordIconIsVisible by remember { mutableStateOf(false) }
     var standByStringIsVisible by remember { mutableStateOf(false) }
@@ -158,6 +165,20 @@ fun CameraScreen(
             putExtra(KEY_RECORDING_CONFIG, config)
         }
         context.startForegroundService(serviceIntent)
+    }
+
+    // ── 亮度、手電筒與全螢幕控制邏輯 (僅在 CameraScreen 啟動) ───────
+    DisposableEffect(Unit) {
+        if (isLowBrightnessApproved) {
+            setScreenBrightness(context, true)
+        }
+        if (isFlashlightApproved) {
+            setFlashlight(context, true)
+        }
+        onDispose {
+            setScreenBrightness(context, false)
+            setFlashlight(context, false)
+        }
     }
 
     // ── 從 SettingScreen 返回時重新讀取設定 ───────────────────────

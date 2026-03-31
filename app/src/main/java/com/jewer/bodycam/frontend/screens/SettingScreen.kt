@@ -39,13 +39,19 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
+import com.jewer.bodycam.backend.functions.getBeepVolume
 import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getFlashlightStatus
+import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
+import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
+import com.jewer.bodycam.backend.functions.updateFlashlightStatus
+import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.updatePersonDetectStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
@@ -63,10 +69,13 @@ fun SettingScreen(
     val userName = remember { mutableStateOf(getUserName(context)) }
     val reName = remember { mutableStateOf(false) }
     var timeIntervalExpand by remember { mutableStateOf(false) }
+    var volumeExpand by remember { mutableStateOf(false) }
     val brandChoose = remember { mutableStateOf(false) }
     val isPersonDetectChecked = remember { mutableStateOf(getPersonDetectStatus(context)) }
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
+    val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
+    val isFlashlightChecked = remember { mutableStateOf(getFlashlightStatus(context)) }
     val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
 
     data class TimeInterval(val displayText: String, val intervalMillis: Long)
@@ -87,12 +96,26 @@ fun SettingScreen(
     }
     var chosenTimeInterval by remember { mutableStateOf(initialInterval) }
 
+    data class VolumeOption(val displayText: String, val percent: Int)
+    val volumeOptions = listOf(
+        VolumeOption("High", 100),
+        VolumeOption("Medium", 60),
+        VolumeOption("Low", 30)
+    )
+    val initialVolume = remember {
+        volumeOptions.find { it.percent == getBeepVolume(context) }
+            ?: volumeOptions.find { it.percent == 100 }!!
+    }
+    var chosenVolume by remember { mutableStateOf(initialVolume) }
+
     val bodycamBrand = listOf("AXON", "MOTOROLA", "TRANSCEND")
 
-    LaunchedEffect(userName, isPersonDetectChecked, isVibrateChecked) {
+    LaunchedEffect(userName, isPersonDetectChecked, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked) {
         updateUserName(context, userName.value)
         updatePersonDetectStatus(context, isPersonDetectChecked.value)
         updateVibrateStatus(context, isVibrateChecked.value)
+        updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
+        updateFlashlightStatus(context, isFlashlightChecked.value)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -141,6 +164,24 @@ fun SettingScreen(
                 }
             }
 
+            // 最低亮度
+            TextButton(onClick = { isLowBrightnessChecked.value = !isLowBrightnessChecked.value; updateLowBrightnessStatus(context, isLowBrightnessChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Low Brightness", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                    Switch(checked = isLowBrightnessChecked.value, onCheckedChange = { isLowBrightnessChecked.value = it; updateLowBrightnessStatus(context, it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                }
+            }
+
+            // 手電筒
+            TextButton(onClick = { isFlashlightChecked.value = !isFlashlightChecked.value; updateFlashlightStatus(context, isFlashlightChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Flashlight", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                    Switch(checked = isFlashlightChecked.value, onCheckedChange = { isFlashlightChecked.value = it; updateFlashlightStatus(context, it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                }
+            }
+
             // 嗶聲/震動間隔
             TextButton(onClick = { timeIntervalExpand = !timeIntervalExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -152,6 +193,23 @@ fun SettingScreen(
                                 chosenTimeInterval = timeOption
                                 updateVibrateAndBeepTimeInterval(context, timeOption.intervalMillis)
                                 timeIntervalExpand = false
+                            })
+                        }
+                    }
+                }
+            }
+
+            // 嗶聲音量選擇
+            TextButton(onClick = { volumeExpand = !volumeExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "Beep Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                    Text(text = chosenVolume.displayText, color = DarkYellow)
+                    DropdownMenu(expanded = volumeExpand, onDismissRequest = { volumeExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                        volumeOptions.forEach { volumeOption ->
+                            DropdownMenuItem(text = { Text(text = volumeOption.displayText, color = White) }, onClick = {
+                                chosenVolume = volumeOption
+                                updateBeepVolume(context, volumeOption.percent)
+                                volumeExpand = false
                             })
                         }
                     }

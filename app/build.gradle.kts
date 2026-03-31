@@ -13,8 +13,8 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 28
-        versionName = "1.1.28"
+        versionCode = 30
+        versionName = "1.1.30"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -25,6 +25,8 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true // 混淆需開啟，但要正確配置規則
+            isShrinkResources = true // 資源縮減
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -41,6 +43,9 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }

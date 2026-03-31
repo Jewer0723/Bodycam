@@ -95,6 +95,24 @@ fun getVibrateAndBeepTimeInterval(context: Context): Long {
 
 /**********************************************************************************************************/
 
+// 更新音量百分比 (0-100)
+fun updateBeepVolume(context: Context, volume: Int) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putInt("beepVolume", volume)
+    }
+}
+
+// 讀取音量百分比 (預設 100)
+fun getBeepVolume(context: Context): Int {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getInt("beepVolume", 100)
+}
+
+/******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
 // 更新說明書對話框顯示布林狀態
 fun updateInstructionAlertDialogStatus(context: Context, isEnabled: Boolean) {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -125,6 +143,42 @@ fun updateBodycamBrand(context: Context, brand: String) {
 fun getBodycamBrand(context: Context): String? {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     return sharedPreferences.getString("brand", "AXON")
+}
+
+/******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
+// 更新最低亮度螢幕布林狀態
+fun updateLowBrightnessStatus(context: Context, isEnabled: Boolean) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putBoolean("lowBrightness", isEnabled)
+    }
+}
+
+// 讀取最低亮度螢幕布林狀態
+fun getLowBrightnessStatus(context: Context): Boolean {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getBoolean("lowBrightness", false)
+}
+
+/******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
+// 更新手電筒布林狀態
+fun updateFlashlightStatus(context: Context, isEnabled: Boolean) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putBoolean("flashlight", isEnabled)
+    }
+}
+
+// 讀取手電筒布林狀態
+fun getFlashlightStatus(context: Context): Boolean {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getBoolean("flashlight", false)
 }
 
 /******************************************************************************************************************/

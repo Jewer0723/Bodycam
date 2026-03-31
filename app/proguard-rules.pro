@@ -1,21 +1,24 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# MediaPipe 核心規則 (防止 A31 等手機載入失敗)
+-keep class com.google.mediapipe.** { *; }
+-dontwarn com.google.mediapipe.**
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# TensorFlow Lite 規則
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# 保持 Assets 原始名稱 (讓模型 .tflite 能被找到)
+-keepclassmembers class * {
+    @androidx.annotation.Keep *;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# 保持所有含有 Native 方法的類別 (JNI 調用)
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# 保持 CameraX 相關類別
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+
+# 保持 Kotlin 序列化與標籤
+-keepattributes Signature,AnnotationDefault,EnclosingMethod,InnerClasses
