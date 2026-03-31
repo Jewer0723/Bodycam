@@ -121,7 +121,6 @@ fun CameraScreen(
     val chosenTimeInterval = getVibrateAndBeepTimeInterval(context)
     val isLowBrightnessApproved = getLowBrightnessStatus(context)
     val isFlashlightApproved = getFlashlightStatus(context)
-    
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var recordIconIsVisible by remember { mutableStateOf(false) }
     var standByStringIsVisible by remember { mutableStateOf(false) }

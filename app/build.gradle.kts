@@ -13,8 +13,8 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.1.30"
+        versionCode = 32
+        versionName = "1.1.32"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
