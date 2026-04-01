@@ -34,7 +34,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Bodycam"
-        android:extractNativeLibs="true"
         tools:targetApi="36">
         <activity
             android:name=".MainActivity"

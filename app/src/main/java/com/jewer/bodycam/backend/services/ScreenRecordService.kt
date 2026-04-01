@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Parcelable
 import android.provider.MediaStore
+import android.util.Log
 import androidx.core.content.getSystemService
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.notifications.NotificationHelper
@@ -38,10 +39,13 @@ class ScreenRecordService: Service() {
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var recordingStartTime: Long = 0
+    
     private val mediaRecorder by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(applicationContext)
         } else {
+            @Suppress("DEPRECATION")
             MediaRecorder()
         }
     }
@@ -51,7 +55,6 @@ class ScreenRecordService: Service() {
         getSystemService<MediaProjectionManager>()
     }
 
-    // 建立 MediaProjection Callback
     private val mediaProjectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
             super.onStop()
@@ -61,68 +64,89 @@ class ScreenRecordService: Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when(intent?.action) {
-            // 收到開始錄影指令
-            START_RECORDING -> {
-                val notification = NotificationHelper.createNotification(applicationContext) // 更新前台服務通知
-                NotificationHelper.createNotificationChannel(applicationContext) // 建立前台服務通知頻道
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                        1,
-                        notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-                    )
-                } else {
-                    startForeground(
-                        1,
-                        notification
-                    )
-                }
-                _isServiceRunning.value = true
+        // 修正 1: 處理 Intent 為 null 的情況 (由系統重啟時發生)
+        if (intent == null) {
+            stopService()
+            return START_NOT_STICKY
+        }
 
-                startRecording(intent) // 開始錄影
+        when(intent.action) {
+            START_RECORDING -> {
+                val notification = NotificationHelper.createNotification(applicationContext)
+                NotificationHelper.createNotificationChannel(applicationContext)
+                
+                try {
+                    // 修正 2: 確保前台服務啟動異常時不會崩潰
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(
+                            1,
+                            notification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                        )
+                    } else {
+                        startForeground(1, notification)
+                    }
+                    _isServiceRunning.value = true
+                    startRecording(intent)
+                } catch (e: Exception) {
+                    Log.e("ScreenRecordService", "Failed to start foreground service", e)
+                    stopService()
+                }
             }
-            // 收到停止錄影指令
             STOP_RECORDING -> {
-                stopRecording() // 停止錄影
+                stopRecordingLogic()
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY // 修正 3: 防止無效 Intent 自動重啟
     }
 
     private fun startRecording(intent: Intent) {
         val config = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(
-                KEY_RECORDING_CONFIG,
-                ScreenRecordConfig::class.java
-            )
+            intent.getParcelableExtra(KEY_RECORDING_CONFIG, ScreenRecordConfig::class.java)
         } else {
+            @Suppress("DEPRECATION")
             intent.getParcelableExtra(KEY_RECORDING_CONFIG)
         }
-        if(config == null) {
+        
+        if(config == null || mediaProjectionManager == null) {
+            Log.e("ScreenRecordService", "Recording config is null")
+            stopService()
             return
         }
 
-        mediaProjection = mediaProjectionManager?.getMediaProjection(
-            config.resultCode,
-            config.data
-        )
-        mediaProjection?.registerCallback(mediaProjectionCallback, null)
+        try {
+            mediaProjection = mediaProjectionManager?.getMediaProjection(
+                config.resultCode,
+                config.data
+            )
+            mediaProjection?.registerCallback(mediaProjectionCallback, null)
 
-        initializeRecorder()
-        mediaRecorder.start()
-
-        virtualDisplay = createVirtualDisplay()
+            if (initializeRecorder()) {
+                mediaRecorder.start()
+                recordingStartTime = System.currentTimeMillis() // 記錄開始時間
+                virtualDisplay = createVirtualDisplay()
+            } else {
+                stopService()
+            }
+        } catch (e: Exception) {
+            Log.e("ScreenRecordService", "Error in startRecording", e)
+            stopService()
+        }
     }
 
-    private fun stopRecording() {
+    private fun stopRecordingLogic() {
         try {
-            mediaRecorder.stop()
+            // 修正 4: 確保錄製時間足夠長，避免 recorder.stop() 狀態異常崩潰
+            if (System.currentTimeMillis() - recordingStartTime > 1000) {
+                mediaRecorder.stop()
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ScreenRecordService", "mediaRecorder.stop failed", e)
+        } finally {
+            mediaRecorder.reset()
+            mediaProjection?.stop()
+            stopService()
         }
-        mediaProjection?.stop()
-        mediaRecorder.reset()
     }
 
     private fun stopService() {
@@ -131,54 +155,65 @@ class ScreenRecordService: Service() {
         stopSelf()
     }
 
-    private fun initializeRecorder() {
-        val filenameFormat = "yyyy-MM-dd-HH-mm-ss" // 檔名格式
-        val videoName = SimpleDateFormat(filenameFormat, Locale.US).format(System.currentTimeMillis()) + ".mp4" // 建立檔名
+    private fun initializeRecorder(): Boolean {
+        return try {
+            val filenameFormat = "yyyy-MM-dd-HH-mm-ss"
+            val videoName = SimpleDateFormat(filenameFormat, Locale.US).format(System.currentTimeMillis()) + ".mp4"
 
-        val contentValues = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, videoName) // 檔名
-            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4") // 存檔格式
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/${getString(R.string.app_name)}") // 儲存相對路徑
-        }
+            val contentValues = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, videoName)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/${getString(R.string.app_name)}")
+                }
+            }
 
-        val videoCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        }
+            val videoCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
 
-        // 建立儲存路徑 Uri
-        val videoUri = contentResolver.insert(videoCollection, contentValues)
-            ?: throw IOException("Failed to create new MediaStore record.")
+            val videoUri = contentResolver.insert(videoCollection, contentValues)
+                ?: throw IOException("Failed to create new MediaStore record.")
 
-        val pfd = contentResolver.openFileDescriptor(videoUri, "rw")
-            ?: throw FileNotFoundException("Failed to open file descriptor for URI: $videoUri")
+            val pfd = contentResolver.openFileDescriptor(videoUri, "rw")
+                ?: throw FileNotFoundException("Failed to open file descriptor")
 
-        // 獲取裝置螢幕解析度
-        val metrics = resources.displayMetrics
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
+            // 修正 5: 確保寬高是 2 的倍數，這對許多硬體編碼器是強制的
+            val metrics = resources.displayMetrics
+            val width = metrics.widthPixels.let { if (it % 2 != 0) it - 1 else it }
+            val height = metrics.heightPixels.let { if (it % 2 != 0) it - 1 else it }
 
-        with(mediaRecorder) {
-            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
-            setVideoSource(MediaRecorder.VideoSource.SURFACE)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setOutputFile(pfd.fileDescriptor)
-            setVideoSize(width, height)
-            setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AMR_WB)
-            setVideoEncodingBitRate(6 * 1024 * 1024) // 設定為 6 Mbps 以維持畫質
-            setVideoFrameRate(30)
-            prepare()
+            with(mediaRecorder) {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setOutputFile(pfd.fileDescriptor)
+                setVideoSize(width, height)
+                setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setVideoEncodingBitRate(6 * 1024 * 1024)
+                setVideoFrameRate(30)
+                prepare()
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("ScreenRecordService", "initializeRecorder failed", e)
+            false
         }
     }
 
     private fun createVirtualDisplay(): VirtualDisplay? {
         val metrics = resources.displayMetrics
+        // 寬高同樣確保為 2 的倍數
+        val width = metrics.widthPixels.let { if (it % 2 != 0) it - 1 else it }
+        val height = metrics.heightPixels.let { if (it % 2 != 0) it - 1 else it }
+
         return mediaProjection?.createVirtualDisplay(
-            "Screen",
-            metrics.widthPixels,
-            metrics.heightPixels,
+            "ScreenRecord",
+            width,
+            height,
             metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             mediaRecorder.surface,
@@ -189,20 +224,26 @@ class ScreenRecordService: Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        releaseResources()
         _isServiceRunning.value = false
         serviceScope.coroutineContext.cancelChildren()
     }
 
     private fun releaseResources() {
-        mediaRecorder.release()
-        virtualDisplay?.release()
-        mediaProjection?.unregisterCallback(mediaProjectionCallback)
-        mediaProjection = null
+        try {
+            virtualDisplay?.release()
+            mediaProjection?.unregisterCallback(mediaProjectionCallback)
+            mediaProjection?.stop()
+            mediaRecorder.release()
+        } catch (e: Exception) {
+            Log.e("ScreenRecordService", "releaseResources error", e)
+        } finally {
+            virtualDisplay = null
+            mediaProjection = null
+        }
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
         private val _isServiceRunning = MutableStateFlow(false)

@@ -13,20 +13,22 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 32
-        versionName = "1.1.32"
+        versionCode = 37
+        versionName = "1.1.37"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        ndk{
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
+        ndk {
+            // 移除 x86_64 和 x86。MediaPipe 通常只提供 ARM 架構的原生庫。
+            // 虛擬機會透過轉譯層執行 ARM 版本，這能解決找不到 .so 的問題。
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true // 混淆需開啟，但要正確配置規則
-            isShrinkResources = true // 資源縮減
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

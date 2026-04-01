@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -59,6 +60,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -82,6 +84,7 @@ import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.setFlashlight
+import com.jewer.bodycam.backend.functions.setFullScreen
 import com.jewer.bodycam.backend.functions.setScreenBrightness
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.vibrateOnce
@@ -98,6 +101,7 @@ import com.jewer.bodycam.ui.theme.Black
 import com.jewer.bodycam.ui.theme.DarkOrange
 import com.jewer.bodycam.ui.theme.DarkRed
 import com.jewer.bodycam.ui.theme.DarkYellow
+import com.jewer.bodycam.ui.theme.LightGreen
 import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
 import kotlinx.coroutines.delay
@@ -136,6 +140,24 @@ fun CameraScreen(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var useUltraWide by remember { mutableStateOf(true) }
     val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
+    
+    // 初始化 ObjectDetectorHelper 並將其保存在 remember 中
+    val objectDetectorHelper = remember {
+        ObjectDetectorHelper(
+            context = context,
+            objectDetectorListener = ObjectDetectorListener(
+                onErrorCallback = { _, _ -> },
+                onResultsCallback = {
+                    if (active) {
+                        frameHeight = it.inputImageHeight
+                        frameWidth = it.inputImageWidth
+                        results = it.results.first()
+                    }
+                }
+            )
+        )
+    }
+
     val cameraSelector = remember(lensFacing, useUltraWide) {
         CameraSelector.Builder().addCameraFilter { cameraInfos ->
             val filtered = cameraInfos.filter { it.lensFacing == lensFacing }
@@ -166,17 +188,23 @@ fun CameraScreen(
         context.startForegroundService(serviceIntent)
     }
 
-    // ── 亮度、手電筒與全螢幕控制邏輯 (僅在 CameraScreen 啟動) ───────
+    // ── 生命週期與硬體控制 ────────────────────────────────────────
     DisposableEffect(Unit) {
-        if (isLowBrightnessApproved) {
-            setScreenBrightness(context, true)
-        }
-        if (isFlashlightApproved) {
-            setFlashlight(context, true)
-        }
+        setFullScreen(context, true)
+        if (isLowBrightnessApproved) setScreenBrightness(context, true)
+        if (isFlashlightApproved) setFlashlight(context, true)
+        
         onDispose {
+            active = false
+            setFullScreen(context, false)
             setScreenBrightness(context, false)
             setFlashlight(context, false)
+            
+            // 重要：離開時立即釋放 MediaPipe 引擎，防止 Native Crash (nativeCreateRgbaImage)
+            objectDetectorHelper.clearObjectDetector()
+            
+            // 釋放相機
+            cameraProviderFuture.get().unbindAll()
         }
     }
 
@@ -195,9 +223,13 @@ fun CameraScreen(
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
+                val preview = Preview.Builder().build()
+
+                // 確保 PreviewView 準備就緒
+                previewView.post {
+                    preview.surfaceProvider = previewView.surfaceProvider
                 }
+                
                 cameraProvider.unbindAll()
 
                 val camera = if (personDetectApproved) {
@@ -206,17 +238,7 @@ fun CameraScreen(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                         .build()
-                    val objectDetectorHelper = ObjectDetectorHelper(
-                        context = context,
-                        objectDetectorListener = ObjectDetectorListener(
-                            onErrorCallback = { _, _ -> },
-                            onResultsCallback = {
-                                frameHeight = it.inputImageHeight
-                                frameWidth = it.inputImageWidth
-                                if (active) { results = it.results.first() }
-                            }
-                        )
-                    )
+
                     imageAnalyzer.setAnalyzer(backgroundExecutor, objectDetectorHelper::detectLivestreamFrame)
                     cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, imageAnalyzer, preview)
                 } else {
@@ -267,14 +289,6 @@ fun CameraScreen(
         if (toolBoxIsVisible) { delay(3000); toolBoxIsVisible = false }
     }
 
-    // ── 生命週期 ──────────────────────────────────────────────────
-    DisposableEffect(Unit) {
-        onDispose {
-            active = false
-            cameraProviderFuture.get().unbindAll()
-        }
-    }
-
     // ════════════════════════════════════════════════════════════
     // UI
     // ════════════════════════════════════════════════════════════
@@ -295,7 +309,6 @@ fun CameraScreen(
                         )
                     }
             ) {
-                // ── 預覽區域 ──
                 AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
                 Row(modifier = Modifier.align(Alignment.TopEnd), verticalAlignment = Alignment.CenterVertically) {
@@ -345,13 +358,14 @@ fun CameraScreen(
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
                 }
-
-                Text(
-                    text = currentBatteryLevel.intValue.toString() + "%",
-                    color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
-                    style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp).size(48.dp)
-                )
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)) {
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
         }
 
@@ -364,7 +378,7 @@ fun CameraScreen(
                             onTap = {
                                 toolBoxIsVisible = !toolBoxIsVisible
                                 if (!isServiceRunning) {
-                                    Toast.makeText(context, "Tap top left \u201CMotorola\u201D icon to start/stop recording", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Tap top left \u201CMOTOROLA\u201D icon to start/stop recording", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )
@@ -413,13 +427,14 @@ fun CameraScreen(
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
                 }
-
-                Text(
-                    text = currentBatteryLevel.intValue.toString() + "%",
-                    color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
-                    style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp).size(48.dp)
-                )
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)) {
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
         }
 
@@ -474,14 +489,239 @@ fun CameraScreen(
                     }
                 }
 
-                Text(
-                    text = currentBatteryLevel.intValue.toString() + "%",
-                    color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
-                    style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp).size(48.dp)
-                )
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)) {
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
         }
+
+        "GETAC" -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                toolBoxIsVisible = !toolBoxIsVisible
+                                if (!isServiceRunning) {
+                                    Toast.makeText(context, "Tap top left \u201CGETAC\u201D icon to start/stop recording", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+            ) {
+                AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+
+                Box(modifier = Modifier.padding(top = 20.dp).fillMaxWidth().height(40.dp).background(Color.Black.copy(alpha = 0.5f)).align(Alignment.TopCenter)) {
+                    Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 30.dp)) {
+                        IconButton(modifier = Modifier.size(96.dp).scale(2.0f), onClick = {
+                            if (isServiceRunning) {
+                                Intent(context.applicationContext, ScreenRecordService::class.java).also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                                if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstoprecordsound)
+                                if (vibrateApproved) vibrateOnce(context, 1000)
+                            } else { screenRecordLauncher.launch(mediaProjectionManager.createScreenCaptureIntent()) }
+                        }) { Icon(painter = painterResource(R.mipmap.ic_getac_icon_foreground), tint = DarkOrange, contentDescription = "WaterMark", modifier = Modifier.size(96.dp)) }
+                    }
+                    Column(modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp, top = 10.dp)) {
+                        Text(text = currentTime.value + " " + userName + " " + getPhoneName(), color = White, style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)))
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.TopEnd).padding(end = 10.dp, top = 60.dp)) {
+                    if (recordIconIsVisible) { Icon(painter = painterResource(R.mipmap.ic_recording_foreground), tint = Red, contentDescription = "REC Icon", modifier = Modifier.size(48.dp)) }
+                    else if (standByStringIsVisible) { Icon(painter = painterResource(R.drawable.ic_start_record_foreground), tint = DarkYellow, contentDescription = "Stand By Icon", modifier = Modifier.size(48.dp)) }
+                }
+
+                Column(modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp)) {
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            navController.navigate(NAV.SETTING)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
+                    }
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
+                            else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)) {
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+        }
+
+        "DOZOR" -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                toolBoxIsVisible = !toolBoxIsVisible
+                                if (!isServiceRunning) {
+                                    Toast.makeText(context, "Tap top right \u201CDOZOR\u201D icon to start/stop recording", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+            ) {
+                // ── 預覽區域 ──
+                AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+
+                Column(modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).scale(1.5f)) {
+                    IconButton(
+                        modifier = Modifier.size(96.dp),
+                        onClick = {
+                            if (isServiceRunning) {
+                                Intent(context.applicationContext, ScreenRecordService::class.java).also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                                if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstoprecordsound)
+                                if (vibrateApproved) vibrateOnce(context, 1000)
+                            } else {
+                                screenRecordLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
+                            }
+                        }
+                    ) {
+                        Icon(painter = painterResource(R.mipmap.ic_dozor_icon_foreground), tint = White, contentDescription = "WaterMark", modifier = Modifier.size(96.dp))
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 15.dp)) {
+                    Text(text = "DZ" + "   " + userName + "  " + getPhoneName() + "   " + "*" + currentTime.value, color = White, style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)), fontSize = 20.sp)
+                }
+
+                Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 10.dp, top = 10.dp)) {
+                    if (recordIconIsVisible) {
+                        Icon(painter = painterResource(R.mipmap.ic_recording_foreground), tint = Red, contentDescription = "REC Icon", modifier = Modifier.size(48.dp))
+                    } else if (standByStringIsVisible) {
+                        Icon(painter = painterResource(R.drawable.ic_start_record_foreground), tint = DarkYellow, contentDescription = "Stand By Icon", modifier = Modifier.size(48.dp))
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp)) {
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            navController.navigate(NAV.SETTING)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
+                    }
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
+                            else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)) {
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+        }
+
+        "PANASONIC" -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                toolBoxIsVisible = !toolBoxIsVisible
+                                if (!isServiceRunning) {
+                                    Toast.makeText(context, "Tap top right \u201CPANASONIC\u201D icon to start/stop recording", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+            ) {
+                // ── 預覽區域 ──
+                AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+
+                Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 20.dp)) {
+                    Text(
+                        text = currentTime.value + "\n" + userName + "   " + getPhoneName(),
+                        color = White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f))
+                    )
+                }
+
+                Column(modifier = Modifier.align(Alignment.TopEnd).padding(end = 30.dp).scale(2.0f)) {
+                    IconButton(
+                        modifier = Modifier.size(96.dp),
+                        onClick = {
+                            if (isServiceRunning) {
+                                Intent(context.applicationContext, ScreenRecordService::class.java).also { it.action = STOP_RECORDING; context.startForegroundService(it) }
+                                if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstoprecordsound)
+                                if (vibrateApproved) vibrateOnce(context, 1000)
+                            } else {
+                                screenRecordLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
+                            }
+                        }
+                    ) {
+                        Icon(painter = painterResource(R.mipmap.ic_panasonic1_icon_foreground), tint = LightGreen, contentDescription = "WaterMark", modifier = Modifier.size(96.dp))
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 10.dp)) {
+                    if (recordIconIsVisible) {
+                        Icon(painter = painterResource(R.mipmap.ic_recording_foreground), tint = Red, contentDescription = "REC Icon", modifier = Modifier.size(48.dp))
+                    } else if (standByStringIsVisible) {
+                        Icon(painter = painterResource(R.drawable.ic_start_record_foreground), tint = DarkYellow, contentDescription = "Stand By Icon", modifier = Modifier.size(48.dp))
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp)) {
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            navController.navigate(NAV.SETTING)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
+                    }
+                    AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
+                        IconButton(modifier = Modifier.size(72.dp), onClick = {
+                            if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
+                            else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (vibrateApproved) vibrateOnce(context, 1000)
+                        }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
+                    }
+                }
+
+                Column(modifier = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 10.dp)){
+                    Text(
+                        text = currentBatteryLevel.intValue.toString() + "%",
+                        color = if (currentBatteryLevel.intValue <= 20) Red else if (currentBatteryLevel.intValue <= 50) DarkYellow else White,
+                        style = MaterialTheme.typography.bodyLarge.copy(shadow = Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 5f)),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+        }
+        else -> {}
     }
 
     // ── 使用手冊 ──────────────────────────────────────────────────
@@ -496,6 +736,9 @@ fun CameraScreen(
                             text = "●  AXON : Tap top right \u201CAXON\u201D icon to start/stop recording.\n\n" +
                                     "●  MOTOROLA : Tap top left \u201CMOTOROLA\u201D icon to start/stop recording.\n\n" +
                                     "●  TRANSCEND : Tap bottom left \u201CTRANSCEND\u201D icon to start/stop recording.\n\n" +
+                                    "●  GETAC : Tap top left \u201CGETAC\u201D icon to start/stop recording.\n\n" +
+                                    "●  DOZOR : Tap top right \u201CDOZOR\u201D icon to start/stop recording.\n\n" +
+                                    "●  PANASONIC : Tap top right \u201CPANASONIC\u201D icon to start/stop recording.\n\n" +
                                     "●  Record result will be stored in \u201CBodycam\u201D folder in device media store space.\n\n" +
                                     "●  For android 14+ device, you can chose to record \u201CA single app\u201D or \u201CEntire screen\u201D.\n\n" +
                                     "●  Tap the screen then \u201Csettings\u201D and \u201Ccamera change\u201D will show on the left side of screen.\n\n" +

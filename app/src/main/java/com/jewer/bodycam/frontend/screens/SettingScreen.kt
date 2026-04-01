@@ -17,8 +17,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -47,6 +45,7 @@ import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
+import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
@@ -56,6 +55,7 @@ import com.jewer.bodycam.backend.functions.updatePersonDetectStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.updateVibrateStatus
+import com.jewer.bodycam.backend.functions.vibrateOnce
 import com.jewer.bodycam.frontend.nav.NAV
 import com.jewer.bodycam.ui.theme.DarkYellow
 import com.jewer.bodycam.ui.theme.Gray
@@ -70,13 +70,19 @@ fun SettingScreen(
     val reName = remember { mutableStateOf(false) }
     var timeIntervalExpand by remember { mutableStateOf(false) }
     var volumeExpand by remember { mutableStateOf(false) }
-    val brandChoose = remember { mutableStateOf(false) }
+    var brandExpand by remember { mutableStateOf(false) }
+    
     val isPersonDetectChecked = remember { mutableStateOf(getPersonDetectStatus(context)) }
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
     val isFlashlightChecked = remember { mutableStateOf(getFlashlightStatus(context)) }
-    val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
+    val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
+
+    val playFeedback = {
+        if (isBeepSoundChecked.value) playSoundAtMaxVolume(context, R.raw.motorolastartrecordsound)
+        if (isVibrateChecked.value) vibrateOnce(context, 500)
+    }
 
     data class TimeInterval(val displayText: String, val intervalMillis: Long)
     val timeIntervalOptions = listOf(
@@ -108,7 +114,7 @@ fun SettingScreen(
     }
     var chosenVolume by remember { mutableStateOf(initialVolume) }
 
-    val bodycamBrand = listOf("AXON", "MOTOROLA", "TRANSCEND")
+    val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
     LaunchedEffect(userName, isPersonDetectChecked, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked) {
         updateUserName(context, userName.value)
@@ -138,46 +144,86 @@ fun SettingScreen(
             HorizontalDivider(thickness = 2.dp)
 
             // 人體辨識
-            TextButton(onClick = { isPersonDetectChecked.value = !isPersonDetectChecked.value; updatePersonDetectStatus(context, isPersonDetectChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            TextButton(onClick = { 
+                isPersonDetectChecked.value = !isPersonDetectChecked.value
+                updatePersonDetectStatus(context, isPersonDetectChecked.value)
+                if (isPersonDetectChecked.value) playFeedback()
+            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Person Detect", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isPersonDetectChecked.value, onCheckedChange = { isPersonDetectChecked.value = it; updatePersonDetectStatus(context, it) },
+                    Switch(checked = isPersonDetectChecked.value, onCheckedChange = { 
+                        isPersonDetectChecked.value = it
+                        updatePersonDetectStatus(context, it)
+                        if (isPersonDetectChecked.value) playFeedback()
+                    },
                         colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
                 }
             }
 
             // 震動
-            TextButton(onClick = { isVibrateChecked.value = !isVibrateChecked.value; updateVibrateStatus(context, isVibrateChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            TextButton(onClick = { 
+                isVibrateChecked.value = !isVibrateChecked.value
+                updateVibrateStatus(context, isVibrateChecked.value)
+                if (isVibrateChecked.value) playFeedback()
+            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Vibrate Effect", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isVibrateChecked.value, onCheckedChange = { isVibrateChecked.value = it; updateVibrateStatus(context, it) },
+                    Switch(checked = isVibrateChecked.value, onCheckedChange = { 
+                        isVibrateChecked.value = it
+                        updateVibrateStatus(context, it)
+                        if (isVibrateChecked.value) playFeedback()
+                    },
                         colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
                 }
             }
 
             // 嗶聲
-            TextButton(onClick = { isBeepSoundChecked.value = !isBeepSoundChecked.value; updateBeepSoundStatus(context, isBeepSoundChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            TextButton(onClick = { 
+                isBeepSoundChecked.value = !isBeepSoundChecked.value
+                updateBeepSoundStatus(context, isBeepSoundChecked.value)
+                if (isBeepSoundChecked.value) playFeedback()
+            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Beep Sound", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isBeepSoundChecked.value, onCheckedChange = { isBeepSoundChecked.value = it; updateBeepSoundStatus(context, it) },
+                    Switch(checked = isBeepSoundChecked.value, onCheckedChange = { 
+                        isBeepSoundChecked.value = it
+                        updateBeepSoundStatus(context, it)
+                        if (isBeepSoundChecked.value) playFeedback()
+                    },
                         colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
                 }
             }
 
             // 最低亮度
-            TextButton(onClick = { isLowBrightnessChecked.value = !isLowBrightnessChecked.value; updateLowBrightnessStatus(context, isLowBrightnessChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            TextButton(onClick = { 
+                isLowBrightnessChecked.value = !isLowBrightnessChecked.value
+                updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
+                if (isLowBrightnessChecked.value) playFeedback()
+            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Low Brightness", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isLowBrightnessChecked.value, onCheckedChange = { isLowBrightnessChecked.value = it; updateLowBrightnessStatus(context, it) },
+                    Switch(checked = isLowBrightnessChecked.value, onCheckedChange = { 
+                        isLowBrightnessChecked.value = it
+                        updateLowBrightnessStatus(context, it)
+                        if (isLowBrightnessChecked.value) playFeedback()
+                    },
                         colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
                 }
             }
 
             // 手電筒
-            TextButton(onClick = { isFlashlightChecked.value = !isFlashlightChecked.value; updateFlashlightStatus(context, isFlashlightChecked.value) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            TextButton(onClick = { 
+                isFlashlightChecked.value = !isFlashlightChecked.value
+                updateFlashlightStatus(context, isFlashlightChecked.value)
+                if (isFlashlightChecked.value) playFeedback()
+            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Flashlight", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isFlashlightChecked.value, onCheckedChange = { isFlashlightChecked.value = it; updateFlashlightStatus(context, it) },
+                    Switch(checked = isFlashlightChecked.value, onCheckedChange = { 
+                        isFlashlightChecked.value = it
+                        updateFlashlightStatus(context, it)
+                        if (isFlashlightChecked.value) playFeedback()
+                    },
                         colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
                 }
             }
@@ -192,6 +238,7 @@ fun SettingScreen(
                             DropdownMenuItem(text = { Text(text = timeOption.displayText, color = White) }, onClick = {
                                 chosenTimeInterval = timeOption
                                 updateVibrateAndBeepTimeInterval(context, timeOption.intervalMillis)
+                                playFeedback()
                                 timeIntervalExpand = false
                             })
                         }
@@ -209,6 +256,7 @@ fun SettingScreen(
                             DropdownMenuItem(text = { Text(text = volumeOption.displayText, color = White) }, onClick = {
                                 chosenVolume = volumeOption
                                 updateBeepVolume(context, volumeOption.percent)
+                                playFeedback()
                                 volumeExpand = false
                             })
                         }
@@ -216,11 +264,21 @@ fun SettingScreen(
                 }
             }
 
-            // 品牌
-            TextButton(onClick = { brandChoose.value = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            // 品牌選擇 (下拉選單方式)
+            TextButton(onClick = { brandExpand = !brandExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(text = "Bodycam Brand", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    chosenBrand.value?.let { Text(text = it, color = DarkYellow) }
+                    Text(text = chosenBrandState.value ?: "AXON", color = DarkYellow)
+                    DropdownMenu(expanded = brandExpand, onDismissRequest = { brandExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                        bodycamBrands.forEach { brand ->
+                            DropdownMenuItem(text = { Text(text = brand, color = White) }, onClick = {
+                                chosenBrandState.value = brand
+                                updateBodycamBrand(context, brand)
+                                playFeedback()
+                                brandExpand = false
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -241,31 +299,12 @@ fun SettingScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { updateUserName(context, userName.value); reName.value = false }) {
+                TextButton(onClick = { 
+                    updateUserName(context, userName.value)
+                    playFeedback()
+                    reName.value = false 
+                }) {
                     Text(text = "confirm")
-                }
-            }
-        )
-    }
-
-    // ── 品牌對話框 ────────────────────────────────────────────────
-    if (brandChoose.value) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text(text = "Choose Bodycam Brand") },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    bodycamBrand.forEach { brand ->
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            RadioButton(selected = chosenBrand.value == brand, onClick = { chosenBrand.value = brand }, modifier = Modifier.padding(end = 8.dp), colors = RadioButtonDefaults.colors(DarkYellow))
-                            Text(modifier = Modifier.padding(top = 10.dp), text = brand)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { chosenBrand.value?.let { updateBodycamBrand(context, it) }; brandChoose.value = false }) {
-                    Text(text = "confirm", color = DarkYellow)
                 }
             }
         )
