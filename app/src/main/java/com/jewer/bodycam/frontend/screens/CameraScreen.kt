@@ -9,9 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -68,7 +66,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.mediapipe.tasks.vision.objectdetector.ObjectDetectorResult
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
@@ -77,20 +74,15 @@ import com.jewer.bodycam.backend.functions.getCurrentTime
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
-import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.setFlashlight
-import com.jewer.bodycam.backend.functions.setFullScreen
 import com.jewer.bodycam.backend.functions.setScreenBrightness
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.vibrateOnce
-import com.jewer.bodycam.backend.objectdetector.ObjectDetectorHelper
-import com.jewer.bodycam.backend.objectdetector.ObjectDetectorListener
-import com.jewer.bodycam.backend.objectdetector.ResultsOverlay
 import com.jewer.bodycam.backend.services.ScreenRecordConfig
 import com.jewer.bodycam.backend.services.ScreenRecordService
 import com.jewer.bodycam.backend.services.ScreenRecordService.Companion.KEY_RECORDING_CONFIG
@@ -105,7 +97,6 @@ import com.jewer.bodycam.ui.theme.LightGreen
 import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
 import kotlinx.coroutines.delay
-import java.util.concurrent.Executors
 
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
@@ -118,7 +109,6 @@ fun CameraScreen(
     val currentTime = remember { mutableStateOf(getCurrentTime()) }
     val currentBatteryLevel = remember { mutableIntStateOf(getCurrentBatteryLevel(context)) }
     val userName = getUserName(context)
-    val personDetectApproved = getPersonDetectStatus(context)
     val vibrateApproved = getVibrateStatus(context)
     val beepSoundApproved = getBeepSoundStatus(context)
     val instructionAlertDialogApproved = getInstructionAlertDialogStatus(context)
@@ -131,32 +121,11 @@ fun CameraScreen(
     var toolBoxIsVisible by remember { mutableStateOf(false) }
     var instructionAlertDialogIsVisible by remember { mutableStateOf(true) }
     val previewView: PreviewView = remember { PreviewView(context) }
-    var results by remember { mutableStateOf<ObjectDetectorResult?>(null) }
-    var frameHeight by remember { mutableIntStateOf(4) }
-    var frameWidth by remember { mutableIntStateOf(3) }
-    var active by remember { mutableStateOf(true) }
     val mediaProjectionManager by lazy { context.getSystemService<MediaProjectionManager>()!! }
     val isServiceRunning by ScreenRecordService.isServiceRunning.collectAsStateWithLifecycle()
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var useUltraWide by remember { mutableStateOf(true) }
     val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
-    
-    // 初始化 ObjectDetectorHelper 並將其保存在 remember 中
-    val objectDetectorHelper = remember {
-        ObjectDetectorHelper(
-            context = context,
-            objectDetectorListener = ObjectDetectorListener(
-                onErrorCallback = { _, _ -> },
-                onResultsCallback = {
-                    if (active) {
-                        frameHeight = it.inputImageHeight
-                        frameWidth = it.inputImageWidth
-                        results = it.results.first()
-                    }
-                }
-            )
-        )
-    }
 
     val cameraSelector = remember(lensFacing, useUltraWide) {
         CameraSelector.Builder().addCameraFilter { cameraInfos ->
@@ -190,21 +159,19 @@ fun CameraScreen(
 
     // ── 生命週期與硬體控制 ────────────────────────────────────────
     DisposableEffect(Unit) {
-        setFullScreen(context, true)
         if (isLowBrightnessApproved) setScreenBrightness(context, true)
         if (isFlashlightApproved) setFlashlight(context, true)
         
         onDispose {
-            active = false
-            setFullScreen(context, false)
             setScreenBrightness(context, false)
             setFlashlight(context, false)
             
-            // 重要：離開時立即釋放 MediaPipe 引擎，防止 Native Crash (nativeCreateRgbaImage)
-            objectDetectorHelper.clearObjectDetector()
-            
-            // 釋放相機
-            cameraProviderFuture.get().unbindAll()
+            // 修正點：安全釋放相機
+            try {
+                cameraProviderFuture.get().unbindAll()
+            } catch (e: Exception) {
+                Log.e("CameraScreen", "Unbind failed on dispose", e)
+            }
         }
     }
 
@@ -218,32 +185,20 @@ fun CameraScreen(
     // ── CameraX 綁定 ──────────────────────────────────────────────
     LaunchedEffect(cameraSelector) {
         val executor = ContextCompat.getMainExecutor(context)
-        val backgroundExecutor = Executors.newSingleThreadExecutor()
 
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
                 val preview = Preview.Builder().build()
 
-                // 確保 PreviewView 準備就緒
+                // 確保在 UI thread 設定 provider
                 previewView.post {
                     preview.surfaceProvider = previewView.surfaceProvider
                 }
-                
+
                 cameraProvider.unbindAll()
 
-                val camera = if (personDetectApproved) {
-                    val imageAnalyzer = ImageAnalysis.Builder()
-                        .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .build()
-
-                    imageAnalyzer.setAnalyzer(backgroundExecutor, objectDetectorHelper::detectLivestreamFrame)
-                    cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, imageAnalyzer, preview)
-                } else {
-                    cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                }
+                val camera = cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
 
                 camera.cameraInfo.zoomState.observe(lifecycleOwner) { zoomState ->
                     camera.cameraControl.setZoomRatio(zoomState.minZoomRatio)
@@ -255,7 +210,7 @@ fun CameraScreen(
         }, executor)
     }
 
-    // ── 時間與電量更新 ────────────────────────────────────────────
+    // ── 時間與電量更新 ──
     LaunchedEffect(Unit) {
         while (true) {
             currentTime.value = getCurrentTime()
@@ -264,7 +219,7 @@ fun CameraScreen(
         }
     }
 
-    // ── 錄影 Icon 閃爍 ────────────────────────────────────────────
+    // ── 錄影 Icon 閃爍 ──
     LaunchedEffect(isServiceRunning) {
         while (isServiceRunning) {
             standByStringIsVisible = false
@@ -275,7 +230,7 @@ fun CameraScreen(
         standByStringIsVisible = true
     }
 
-    // ── 定時嗶聲/震動 ─────────────────────────────────────────────
+    // ── 定時嗶聲/震動 ──
     LaunchedEffect(isServiceRunning) {
         while (isServiceRunning) {
             if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonrecordingsound)
@@ -284,7 +239,7 @@ fun CameraScreen(
         }
     }
 
-    // ── 工具列 3 秒自動隱藏 ──────────────────────────────────────
+    // ── 工具列 3 秒自動隱藏 ──
     LaunchedEffect(toolBoxIsVisible) {
         if (toolBoxIsVisible) { delay(3000); toolBoxIsVisible = false }
     }
@@ -721,7 +676,6 @@ fun CameraScreen(
                 }
             }
         }
-        else -> {}
     }
 
     // ── 使用手冊 ──────────────────────────────────────────────────
@@ -759,10 +713,5 @@ fun CameraScreen(
                 }
             }
         )
-    }
-
-    // ── 物件方框繪製 ──────────────────────────────────────────────
-    results?.let {
-        ResultsOverlay(context = context, results = it, frameWidth = frameWidth, frameHeight = frameHeight)
     }
 }

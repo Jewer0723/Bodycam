@@ -13,15 +13,13 @@ android {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "1.1.37"
+        versionCode = 39
+        versionName = "1.1.39"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            // 移除 x86_64 和 x86。MediaPipe 通常只提供 ARM 架構的原生庫。
-            // 虛擬機會透過轉譯層執行 ARM 版本，這能解決找不到 .so 的問題。
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
     }
 
@@ -67,9 +65,7 @@ dependencies {
     implementation (libs.androidx.camera.view)
     implementation (libs.androidx.camera.extensions)
     implementation (libs.androidx.camera.video)
-
-    // mediapipe library
-    implementation (libs.tasks.vision)
+    implementation(libs.guava)
 
     // system library
     implementation(libs.androidx.core.ktx)

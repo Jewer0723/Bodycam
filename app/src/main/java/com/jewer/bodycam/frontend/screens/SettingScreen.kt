@@ -41,7 +41,6 @@ import com.jewer.bodycam.backend.functions.getBeepVolume
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
-import com.jewer.bodycam.backend.functions.getPersonDetectStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
@@ -51,7 +50,6 @@ import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
 import com.jewer.bodycam.backend.functions.updateFlashlightStatus
 import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
-import com.jewer.bodycam.backend.functions.updatePersonDetectStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.updateVibrateStatus
@@ -71,8 +69,6 @@ fun SettingScreen(
     var timeIntervalExpand by remember { mutableStateOf(false) }
     var volumeExpand by remember { mutableStateOf(false) }
     var brandExpand by remember { mutableStateOf(false) }
-    
-    val isPersonDetectChecked = remember { mutableStateOf(getPersonDetectStatus(context)) }
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
@@ -116,9 +112,8 @@ fun SettingScreen(
 
     val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
-    LaunchedEffect(userName, isPersonDetectChecked, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked) {
+    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked) {
         updateUserName(context, userName.value)
-        updatePersonDetectStatus(context, isPersonDetectChecked.value)
         updateVibrateStatus(context, isVibrateChecked.value)
         updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
         updateFlashlightStatus(context, isFlashlightChecked.value)
@@ -142,23 +137,6 @@ fun SettingScreen(
             }
 
             HorizontalDivider(thickness = 2.dp)
-
-            // 人體辨識
-            TextButton(onClick = { 
-                isPersonDetectChecked.value = !isPersonDetectChecked.value
-                updatePersonDetectStatus(context, isPersonDetectChecked.value)
-                if (isPersonDetectChecked.value) playFeedback()
-            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Person Detect", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isPersonDetectChecked.value, onCheckedChange = { 
-                        isPersonDetectChecked.value = it
-                        updatePersonDetectStatus(context, it)
-                        if (isPersonDetectChecked.value) playFeedback()
-                    },
-                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
-                }
-            }
 
             // 震動
             TextButton(onClick = { 

@@ -23,24 +23,6 @@ fun getUserName(context: Context): String {
 
 /**********************************************************************************************************/
 
-// 更新人體辨識布林狀態
-fun updatePersonDetectStatus(context: Context, isEnabled: Boolean) {
-    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    sharedPreferences.edit {
-        putBoolean("personDetect", isEnabled)
-    }
-}
-
-// 讀取人體辨識布林狀態
-fun getPersonDetectStatus(context: Context): Boolean {
-    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    return sharedPreferences.getBoolean("personDetect", false)
-}
-
-/**********************************************************************************************************/
-
-/**********************************************************************************************************/
-
 // 更新震動布林狀態
 fun updateVibrateStatus(context: Context, isEnabled: Boolean) {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
