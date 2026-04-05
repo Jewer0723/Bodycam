@@ -235,7 +235,14 @@ fun CameraScreen(
     // ── 定時嗶聲/震動 ──
     LaunchedEffect(isServiceRunning) {
         while (isServiceRunning) {
-            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonrecordingsound)
+            if (beepSoundApproved) {
+                if (chosenBrand.value == "MOTOROLA") {
+                    playSoundAtMaxVolume(context, R.raw.motorolastartrecordsound)
+                }
+                else {
+                    playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                }
+            }
             if (vibrateApproved) repeat(2) { vibrateOnce(context, 300); delay(400) }
             delay(chosenTimeInterval)
         }
@@ -314,7 +321,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -322,7 +329,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
@@ -372,7 +379,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(96.dp), onClick = {
                             if (isServiceRunning) {
                                 Intent(context.applicationContext, ScreenRecordService::class.java).also { it.action = STOP_RECORDING; context.startForegroundService(it) }
-                                if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstoprecordsound)
+                                if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.motorolastoprecordsound)
                                 if (vibrateApproved) vibrateOnce(context, 1000)
                             } else { screenRecordLauncher.launch(mediaProjectionManager.createScreenCaptureIntent()) }
                         }) { Icon(painter = painterResource(R.mipmap.ic_motorola_icon_foreground), tint = White, contentDescription = "WaterMark", modifier = Modifier.size(96.dp)) }
@@ -403,7 +410,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -411,7 +418,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
@@ -476,7 +483,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -484,7 +491,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
@@ -565,7 +572,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -573,7 +580,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
@@ -658,7 +665,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -666,7 +673,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }
@@ -759,7 +766,7 @@ fun CameraScreen(
                     AnimatedVisibility(visible = toolBoxIsVisible, enter = fadeIn(), exit = fadeOut()) {
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             navController.navigate(NAV.SETTING)
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_settings_foreground), tint = White, contentDescription = "Settings", modifier = Modifier.size(72.dp)) }
                     }
@@ -767,7 +774,7 @@ fun CameraScreen(
                         IconButton(modifier = Modifier.size(72.dp), onClick = {
                             if (lensFacing == CameraSelector.LENS_FACING_BACK) { lensFacing = CameraSelector.LENS_FACING_FRONT; useUltraWide = false }
                             else { lensFacing = CameraSelector.LENS_FACING_BACK; useUltraWide = true }
-                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.axonstartrecordsound)
+                            if (beepSoundApproved) playSoundAtMaxVolume(context, R.raw.buttontouchedsound)
                             if (vibrateApproved) vibrateOnce(context, 1000)
                         }) { Icon(painter = painterResource(R.drawable.ic_camera_switch_foreground), tint = White, contentDescription = "Switch Camera", modifier = Modifier.size(72.dp)) }
                     }

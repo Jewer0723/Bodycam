@@ -76,7 +76,7 @@ fun SettingScreen(
     val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
 
     val playFeedback = {
-        if (isBeepSoundChecked.value) playSoundAtMaxVolume(context, R.raw.motorolastartrecordsound)
+        if (isBeepSoundChecked.value) playSoundAtMaxVolume(context, R.raw.settingsactivatedsound)
         if (isVibrateChecked.value) vibrateOnce(context, 500)
     }
 
