@@ -186,13 +186,16 @@ class ScreenRecordService: Service() {
             val height = metrics.heightPixels.let { if (it % 2 != 0) it - 1 else it }
 
             with(mediaRecorder) {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
                 setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setOutputFile(pfd.fileDescriptor)
                 setVideoSize(width, height)
                 setVideoEncoder(MediaRecorder.VideoEncoder.H264)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(44100)
+                setAudioEncodingBitRate(128000)
+                setAudioChannels(1)
                 setVideoEncodingBitRate(6 * 1024 * 1024)
                 setVideoFrameRate(30)
                 prepare()
