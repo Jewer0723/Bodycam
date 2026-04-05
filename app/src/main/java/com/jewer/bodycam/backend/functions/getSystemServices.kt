@@ -15,7 +15,7 @@ import java.util.Locale
 
 // 獲取現在時間
 fun getCurrentTime(): String {
-    val timeFormat = "yyyy-MM-dd   HH:mm:ss"
+    val timeFormat = "yyyy-MM-dd HH:mm:ss"
     return SimpleDateFormat(timeFormat, Locale.US).format(System.currentTimeMillis())
 }
 
