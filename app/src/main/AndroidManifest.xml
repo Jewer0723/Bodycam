@@ -17,9 +17,15 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <!-- 震動授權 -->
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- 存取媒體授權 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <!-- 通知授權 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -53,7 +59,7 @@
             android:name=".backend.services.ScreenRecordService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection">
+            android:foregroundServiceType="mediaProjection|microphone|camera">
         </service>
     </application>
 

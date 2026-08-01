@@ -4,9 +4,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +18,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -31,15 +34,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBeepVolume
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
+import com.jewer.bodycam.backend.functions.getKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
@@ -49,6 +55,7 @@ import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
 import com.jewer.bodycam.backend.functions.updateFlashlightStatus
+import com.jewer.bodycam.backend.functions.updateKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
@@ -73,6 +80,7 @@ fun SettingScreen(
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
     val isFlashlightChecked = remember { mutableStateOf(getFlashlightStatus(context)) }
+    val isKeyRecordingChecked = remember { mutableStateOf(getKeyRecordingStatus(context)) }
     val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
 
     val playFeedback = {
@@ -112,24 +120,26 @@ fun SettingScreen(
 
     val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
-    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked) {
+    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked, isKeyRecordingChecked) {
         updateUserName(context, userName.value)
         updateVibrateStatus(context, isVibrateChecked.value)
         updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
         updateFlashlightStatus(context, isFlashlightChecked.value)
+        updateKeyRecordingStatus(context, isKeyRecordingChecked.value)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .padding(top = 50.dp, start = 16.dp)
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 返回 + 使用者名稱列
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { navController.navigate(NAV.CAMERA) }) {
                     Icon(painter = painterResource(R.drawable.ic_arrowback_foreground), contentDescription = "Back", modifier = Modifier.padding(end = 8.dp), tint = White)
                 }
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(text = "Settings", color = White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                 Text(text = userName.value, textAlign = TextAlign.End, modifier = Modifier.weight(1f), color = White)
                 IconButton(onClick = { reName.value = true }) {
                     Icon(painter = painterResource(id = R.drawable.ic_modify_user_name_foreground), contentDescription = "rename", modifier = Modifier.padding(end = 8.dp), tint = DarkYellow)
@@ -138,123 +148,148 @@ fun SettingScreen(
 
             HorizontalDivider(thickness = 2.dp)
 
-            // 震動
-            TextButton(onClick = { 
-                isVibrateChecked.value = !isVibrateChecked.value
-                updateVibrateStatus(context, isVibrateChecked.value)
-                if (isVibrateChecked.value) playFeedback()
-            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Vibrate Effect", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isVibrateChecked.value, onCheckedChange = { 
-                        isVibrateChecked.value = it
-                        updateVibrateStatus(context, it)
-                        if (isVibrateChecked.value) playFeedback()
-                    },
-                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)
+                    .verticalScroll(rememberScrollState()
+                )
+            ) {
+                // 震動
+                TextButton(onClick = {
+                    isVibrateChecked.value = !isVibrateChecked.value
+                    updateVibrateStatus(context, isVibrateChecked.value)
+                    if (isVibrateChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Vibrate Effect", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isVibrateChecked.value, onCheckedChange = {
+                            isVibrateChecked.value = it
+                            updateVibrateStatus(context, it)
+                            if (isVibrateChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
                 }
-            }
 
-            // 嗶聲
-            TextButton(onClick = { 
-                isBeepSoundChecked.value = !isBeepSoundChecked.value
-                updateBeepSoundStatus(context, isBeepSoundChecked.value)
-                if (isBeepSoundChecked.value) playFeedback()
-            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Beep Sound", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isBeepSoundChecked.value, onCheckedChange = { 
-                        isBeepSoundChecked.value = it
-                        updateBeepSoundStatus(context, it)
-                        if (isBeepSoundChecked.value) playFeedback()
-                    },
-                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                // 嗶聲
+                TextButton(onClick = {
+                    isBeepSoundChecked.value = !isBeepSoundChecked.value
+                    updateBeepSoundStatus(context, isBeepSoundChecked.value)
+                    if (isBeepSoundChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Beep Sound", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isBeepSoundChecked.value, onCheckedChange = {
+                            isBeepSoundChecked.value = it
+                            updateBeepSoundStatus(context, it)
+                            if (isBeepSoundChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
                 }
-            }
 
-            // 最低亮度
-            TextButton(onClick = { 
-                isLowBrightnessChecked.value = !isLowBrightnessChecked.value
-                updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
-                if (isLowBrightnessChecked.value) playFeedback()
-            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Low Brightness", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isLowBrightnessChecked.value, onCheckedChange = { 
-                        isLowBrightnessChecked.value = it
-                        updateLowBrightnessStatus(context, it)
-                        if (isLowBrightnessChecked.value) playFeedback()
-                    },
-                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                // 最低亮度
+                TextButton(onClick = {
+                    isLowBrightnessChecked.value = !isLowBrightnessChecked.value
+                    updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
+                    if (isLowBrightnessChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Low Brightness", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isLowBrightnessChecked.value, onCheckedChange = {
+                            isLowBrightnessChecked.value = it
+                            updateLowBrightnessStatus(context, it)
+                            if (isLowBrightnessChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
                 }
-            }
 
-            // 手電筒
-            TextButton(onClick = { 
-                isFlashlightChecked.value = !isFlashlightChecked.value
-                updateFlashlightStatus(context, isFlashlightChecked.value)
-                if (isFlashlightChecked.value) playFeedback()
-            }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Flashlight", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Switch(checked = isFlashlightChecked.value, onCheckedChange = { 
-                        isFlashlightChecked.value = it
-                        updateFlashlightStatus(context, it)
-                        if (isFlashlightChecked.value) playFeedback()
-                    },
-                        colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                // 手電筒
+                TextButton(onClick = {
+                    isFlashlightChecked.value = !isFlashlightChecked.value
+                    updateFlashlightStatus(context, isFlashlightChecked.value)
+                    if (isFlashlightChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Flashlight", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isFlashlightChecked.value, onCheckedChange = {
+                            isFlashlightChecked.value = it
+                            updateFlashlightStatus(context, it)
+                            if (isFlashlightChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
                 }
-            }
 
-            // 嗶聲/震動間隔
-            TextButton(onClick = { timeIntervalExpand = !timeIntervalExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Vibrate/Beep Sound Time Interval", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Text(text = chosenTimeInterval.displayText, color = DarkYellow)
-                    DropdownMenu(expanded = timeIntervalExpand, onDismissRequest = { timeIntervalExpand = false }, modifier = Modifier.border(1.dp, White)) {
-                        timeIntervalOptions.forEach { timeOption ->
-                            DropdownMenuItem(text = { Text(text = timeOption.displayText, color = White) }, onClick = {
-                                chosenTimeInterval = timeOption
-                                updateVibrateAndBeepTimeInterval(context, timeOption.intervalMillis)
-                                playFeedback()
-                                timeIntervalExpand = false
-                            })
+                // 音量鍵錄影
+                TextButton(onClick = {
+                    isKeyRecordingChecked.value = !isKeyRecordingChecked.value
+                    updateKeyRecordingStatus(context, isKeyRecordingChecked.value)
+                    if (isKeyRecordingChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Volume Keys Record (Up: Start / Down: Stop)", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isKeyRecordingChecked.value, onCheckedChange = {
+                            isKeyRecordingChecked.value = it
+                            updateKeyRecordingStatus(context, it)
+                            if (isKeyRecordingChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 嗶聲/震動間隔
+                TextButton(onClick = { timeIntervalExpand = !timeIntervalExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Vibrate/Beep Sound Time Interval", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = chosenTimeInterval.displayText, color = DarkYellow)
+                        DropdownMenu(expanded = timeIntervalExpand, onDismissRequest = { timeIntervalExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            timeIntervalOptions.forEach { timeOption ->
+                                DropdownMenuItem(text = { Text(text = timeOption.displayText, color = White) }, onClick = {
+                                    chosenTimeInterval = timeOption
+                                    updateVibrateAndBeepTimeInterval(context, timeOption.intervalMillis)
+                                    playFeedback()
+                                    timeIntervalExpand = false
+                                })
+                            }
                         }
                     }
                 }
-            }
 
-            // 嗶聲音量選擇
-            TextButton(onClick = { volumeExpand = !volumeExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Beep Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Text(text = chosenVolume.displayText, color = DarkYellow)
-                    DropdownMenu(expanded = volumeExpand, onDismissRequest = { volumeExpand = false }, modifier = Modifier.border(1.dp, White)) {
-                        volumeOptions.forEach { volumeOption ->
-                            DropdownMenuItem(text = { Text(text = volumeOption.displayText, color = White) }, onClick = {
-                                chosenVolume = volumeOption
-                                updateBeepVolume(context, volumeOption.percent)
-                                playFeedback()
-                                volumeExpand = false
-                            })
+                // 嗶聲音量選擇
+                TextButton(onClick = { volumeExpand = !volumeExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Beep Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = chosenVolume.displayText, color = DarkYellow)
+                        DropdownMenu(expanded = volumeExpand, onDismissRequest = { volumeExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            volumeOptions.forEach { volumeOption ->
+                                DropdownMenuItem(text = { Text(text = volumeOption.displayText, color = White) }, onClick = {
+                                    chosenVolume = volumeOption
+                                    updateBeepVolume(context, volumeOption.percent)
+                                    playFeedback()
+                                    volumeExpand = false
+                                })
+                            }
                         }
                     }
                 }
-            }
 
-            // 品牌選擇 (下拉選單方式)
-            TextButton(onClick = { brandExpand = !brandExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "Bodycam Brand", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                    Text(text = chosenBrandState.value ?: "AXON", color = DarkYellow)
-                    DropdownMenu(expanded = brandExpand, onDismissRequest = { brandExpand = false }, modifier = Modifier.border(1.dp, White)) {
-                        bodycamBrands.forEach { brand ->
-                            DropdownMenuItem(text = { Text(text = brand, color = White) }, onClick = {
-                                chosenBrandState.value = brand
-                                updateBodycamBrand(context, brand)
-                                playFeedback()
-                                brandExpand = false
-                            })
+                // 品牌選擇 (下拉選單方式)
+                TextButton(onClick = { brandExpand = !brandExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Bodycam Brand", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = chosenBrandState.value ?: "AXON", color = DarkYellow)
+                        DropdownMenu(expanded = brandExpand, onDismissRequest = { brandExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            bodycamBrands.forEach { brand ->
+                                DropdownMenuItem(text = { Text(text = brand, color = White) }, onClick = {
+                                    chosenBrandState.value = brand
+                                    updateBodycamBrand(context, brand)
+                                    playFeedback()
+                                    brandExpand = false
+                                })
+                            }
                         }
                     }
                 }

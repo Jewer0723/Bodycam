@@ -2,7 +2,6 @@ package com.jewer.bodycam.backend.functions
 
 import android.app.Activity
 import android.content.Context
-import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.BatteryManager
@@ -54,17 +53,6 @@ fun setScreenBrightness(context: Context, isLow: Boolean) {
     // 0.01f 是最低亮度，BRIGHTNESS_OVERRIDE_NONE (-1.0f) 表示恢復系統自動調整
     layoutParams.screenBrightness = if (isLow) 0.01f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
     activity.window.attributes = layoutParams
-}
-
-// 手電筒控制 (僅執行硬體開關)
-fun setFlashlight(context: Context, isEnabled: Boolean) {
-    val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-    try {
-        val cameraId = cameraManager.cameraIdList[0]
-        cameraManager.setTorchMode(cameraId, isEnabled)
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
 }
 
 // 撥放音檔及音量控制

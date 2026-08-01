@@ -43,9 +43,12 @@ fun PermissionScreen() {
         buildList {
             add(Manifest.permission.CAMERA)
             add(Manifest.permission.RECORD_AUDIO)
-            // 只有 Android 13 (API 33) 以上才需要請求通知權限
+            // 存取媒體權限
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
+                add(Manifest.permission.READ_MEDIA_VIDEO)
+            } else {
+                add(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
         }
     }

@@ -11,12 +11,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.jewer.bodycam.frontend.screens.CameraScreen
 import com.jewer.bodycam.frontend.screens.SettingScreen
+import com.jewer.bodycam.frontend.screens.VideoScreen
 import com.jewer.bodycam.ui.theme.Black
 
 // 導航頁面物件
 object NAV {
     const val CAMERA = "camera"
     const val SETTING = "setting"
+    const val VIDEO = "video"
 }
 
 // 導航頁面方法
@@ -37,6 +39,9 @@ fun Navigation(navController: NavHostController) {
         }
         composable(route = NAV.SETTING) {
             SettingScreen(navController)
+        }
+        composable(route = NAV.VIDEO) {
+            VideoScreen(navController)
         }
     }
 }

@@ -164,3 +164,21 @@ fun getFlashlightStatus(context: Context): Boolean {
 }
 
 /******************************************************************************************************************/
+
+/**********************************************************************************************************/
+
+// 更新按鍵錄影布林狀態
+fun updateKeyRecordingStatus(context: Context, isEnabled: Boolean) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putBoolean("keyRecording", isEnabled)
+    }
+}
+
+// 讀取按鍵錄影布林狀態
+fun getKeyRecordingStatus(context: Context): Boolean {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getBoolean("keyRecording", false)
+}
+
+/******************************************************************************************************************/
