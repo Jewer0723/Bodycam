@@ -43,12 +43,28 @@ fun PermissionScreen() {
         buildList {
             add(Manifest.permission.CAMERA)
             add(Manifest.permission.RECORD_AUDIO)
-            // 存取媒體權限
+            // 存取媒體與通知權限
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
                 add(Manifest.permission.READ_MEDIA_VIDEO)
             } else {
                 add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+
+            // Nearby Connections (Radio) 必備：位置權限
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+            // Android 12 (API 31) 以上需要獨立的藍牙權限
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_ADVERTISE)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+
+            // Android 13 (API 33) 以上需要附近 Wi-Fi 權限
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.NEARBY_WIFI_DEVICES)
             }
         }
     }

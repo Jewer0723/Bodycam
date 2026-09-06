@@ -1,5 +1,9 @@
 package com.jewer.bodycam.backend.services
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
 import android.content.Intent
@@ -16,12 +20,20 @@ import android.os.Looper
 import android.os.Parcelable
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.jewer.bodycam.MainActivity
 import com.jewer.bodycam.R
-import com.jewer.bodycam.backend.notifications.NotificationHelper
+import com.jewer.bodycam.backend.functions.getBeepSoundStatus
+import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
+import com.jewer.bodycam.backend.functions.getVibrateStatus
+import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
+import com.jewer.bodycam.backend.functions.vibrateOnce
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -32,6 +44,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 @Parcelize
 data class ScreenRecordConfig(
@@ -71,8 +84,8 @@ class ScreenRecordService: Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // 必須先建立頻道，且確保在所有路徑下都調用 startForeground
-        NotificationHelper.createNotificationChannel(applicationContext)
-        val notification = NotificationHelper.createNotification(applicationContext)
+        createNotificationChannel()
+        val notification = createNotification()
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -116,12 +129,12 @@ class ScreenRecordService: Service() {
                     Handler(Looper.getMainLooper()).postDelayed({
                         try {
                             mediaProjection = mediaProjectionManager?.getMediaProjection(config.resultCode, config.data)
-                            
+
                             if (mediaProjection != null) {
                                 mediaProjection?.registerCallback(mediaProjectionCallback, Handler(Looper.getMainLooper()))
                                 isResourcesReleased = false
                                 _isServiceRunning.value = true
-                                
+
                                 serviceScope.launch {
                                     if (initializeRecorder()) {
                                         try {
@@ -129,6 +142,7 @@ class ScreenRecordService: Service() {
                                             mediaRecorder.start()
                                             recordingStartTime = System.currentTimeMillis()
                                             Log.d("ScreenRecordService", "Recording started successfully")
+                                            startPeriodicBeep()
                                         } catch (e: Exception) {
                                             Log.e("ScreenRecordService", "MediaRecorder start failed", e)
                                             stopService()
@@ -187,6 +201,29 @@ class ScreenRecordService: Service() {
         _isServiceRunning.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun startPeriodicBeep() {
+        serviceScope.launch {
+            while (_isServiceRunning.value) {
+                val beepApproved = getBeepSoundStatus(applicationContext)
+                val vibrateApproved = getVibrateStatus(applicationContext)
+                val brand = getBodycamBrand(applicationContext)
+                val interval = getVibrateAndBeepTimeInterval(applicationContext)
+
+                if (beepApproved) {
+                    val soundRes = if (brand == "MOTOROLA") R.raw.motorolastartrecordsound else R.raw.axonstartrecordsound
+                    playSoundAtMaxVolume(applicationContext, soundRes)
+                }
+                if (vibrateApproved) {
+                    repeat(2) {
+                        vibrateOnce(applicationContext, 300)
+                        delay(400.milliseconds)
+                    }
+                }
+                delay(interval.milliseconds)
+            }
+        }
     }
 
     private fun initializeRecorder(): Boolean {
@@ -284,9 +321,45 @@ class ScreenRecordService: Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun createNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+        )
+        val notifyTitle = "Recording..."
+        val notifyText = when(getBodycamBrand(this)) {
+            "AXON" -> "Tap top right “AXON” icon to stop recording"
+            "MOTOROLA" -> "Tap top left “MOTOROLA” icon to stop recording"
+            "TRANSCEND" -> "Tap bottom left “TRANSCEND” icon to stop recording"
+            "GETAC" -> "Tap top left “GETAC” icon to stop recording"
+            "DOZOR" -> "Tap top right “DOZOR” icon to stop recording"
+            "PANASONIC" -> "Tap top right “PANASONIC” icon to stop recording"
+            else -> "Tap the icon to stop recording"
+        }
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(notifyTitle)
+            .setContentText(notifyText)
+            .setSmallIcon(R.mipmap.ic_water_mark_foreground)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun createNotificationChannel() {
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val serviceChannel = NotificationChannel(
+            CHANNEL_ID,
+            "Screen Recording Channel",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        notificationManager.createNotificationChannel(serviceChannel)
+    }
+
     companion object {
+        private const val CHANNEL_ID = "screen_recording_channel"
         private val _isServiceRunning = MutableStateFlow(false)
-        val isServiceRunning = _isServiceRunning.asStateFlow()
+        val isRecordingRunning = _isServiceRunning.asStateFlow()
 
         // 按鍵觸發錄影信號
         private val _triggerStartRecording = MutableSharedFlow<Unit>(extraBufferCapacity = 1)

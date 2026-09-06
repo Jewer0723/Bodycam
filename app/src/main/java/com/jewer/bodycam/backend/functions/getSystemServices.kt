@@ -5,7 +5,12 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.BatteryManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.WindowManager
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -26,8 +31,15 @@ fun getCurrentBatteryLevel(context: Context): Int {
 
 // 震動秒數控制
 fun vibrateOnce(context: Context, duration: Long) {
-    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-    vibrator.vibrate(duration) // 震動指定的毫秒數
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vibratorManager.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    }
+
+    vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
 }
 
 // 全螢幕控制 (隱藏狀態列與導航列)
@@ -59,7 +71,7 @@ fun setScreenBrightness(context: Context, isLow: Boolean) {
 fun playSoundAtMaxVolume(context: Context, resourceId: Int) {
     val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    // 1. 記錄當前的媒體音量.
+    // 1. 記錄當前的媒體音量
     val originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
     // 2. 獲取使用者設定的音量百分比 (Low: 30, Medium: 60, High: 100)
@@ -72,16 +84,19 @@ fun playSoundAtMaxVolume(context: Context, resourceId: Int) {
     audioManager.setStreamVolume(
         AudioManager.STREAM_MUSIC,
         targetVolume,
-        0 // 0 表示不在螢幕上顯示音量調整UI
+        0
     )
 
-    // 4. 建立並播放音檔
+    // 4. 使用一個單獨的引用來防止被過早回收
     val mediaPlayer = MediaPlayer.create(context, resourceId)
 
     mediaPlayer?.let { mp ->
         mp.setOnCompletionListener {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalVolume, 0)
-            it.release()
+            // 稍微延遲一點再切回音量，確保尾音播放完整
+            postDelayed {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalVolume, 0)
+                it.release()
+            }
         }
         mp.setOnErrorListener { _, _, _ ->
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalVolume, 0)
@@ -92,4 +107,9 @@ fun playSoundAtMaxVolume(context: Context, resourceId: Int) {
     } ?: run {
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalVolume, 0)
     }
+}
+
+// 輔助擴展函式，用於延遲執行
+private fun postDelayed(action: () -> Unit) {
+    Handler(Looper.getMainLooper()).postDelayed(action, 300L)
 }

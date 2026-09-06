@@ -1,8 +1,9 @@
 [versions]
 accompanistPermissionsVersion = "0.37.3"
-agp = "9.3.1"
-cameraVideoVersion = "1.6.1"
-guavaVersion = "33.6.0-android"
+agp = "9.4.0"
+cameraVideoVersion = "1.6.2"
+desugar_jdk_libsVersion = "2.1.5"
+guavaVersion = "33.7.1-android"
 kotlin = "2.4.10"
 coreKtx = "1.19.0"
 junit = "4.13.2"
@@ -10,18 +11,21 @@ junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
-composeBom = "2026.06.01"
-navigationCompose = "2.9.8"
-cameraCoreVersion = "1.6.1"
+composeBom = "2026.08.00"
+navigationCompose = "2.10.0"
+cameraCoreVersion = "1.6.2"
 lifecycleProcessVersion = "2.11.0"
-uiTestManifest = "1.11.4"
-media3Exoplayer = "1.10.1"
-media3Ui = "1.10.1"
+uiTestManifest = "1.12.0"
+media3Exoplayer = "1.11.0"
+media3Ui = "1.11.0"
+mlkit-pose-accurate = "18.0.0-beta5"
+play-services-nearby = "19.5.0"
 coil = "2.7.0"
 
 [libraries]
 androidx-camera-extensions = { module = "androidx.camera:camera-extensions", version.ref = "cameraVideoVersion" }
 androidx-camera-video = { module = "androidx.camera:camera-video", version.ref = "cameraVideoVersion" }
+desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libsVersion" }
 google-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissionsVersion" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version = "cameraCoreVersion" }
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCoreVersion" }
@@ -47,6 +51,8 @@ androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-p
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3Exoplayer" }
 androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3Ui" }
+mlkit-pose-accurate = { group = "com.google.mlkit", name = "pose-detection-accurate", version.ref = "mlkit-pose-accurate" }
+play-services-nearby = { group = "com.google.android.gms", name = "play-services-nearby", version.ref = "play-services-nearby" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 coil-video = { group = "io.coil-kt", name = "coil-video", version.ref = "coil" }
 

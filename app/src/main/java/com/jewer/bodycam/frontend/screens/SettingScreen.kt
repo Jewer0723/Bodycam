@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -27,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,20 +45,26 @@ import androidx.navigation.NavController
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBeepVolume
+import com.jewer.bodycam.backend.functions.getBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
+import com.jewer.bodycam.backend.functions.getOrientationMode
+import com.jewer.bodycam.backend.functions.getSimulatedWideAngleStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBeepVolume
+import com.jewer.bodycam.backend.functions.updateBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
 import com.jewer.bodycam.backend.functions.updateFlashlightStatus
 import com.jewer.bodycam.backend.functions.updateKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
+import com.jewer.bodycam.backend.functions.updateOrientationMode
+import com.jewer.bodycam.backend.functions.updateSimulatedWideAngleStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.updateVibrateStatus
@@ -64,6 +72,7 @@ import com.jewer.bodycam.backend.functions.vibrateOnce
 import com.jewer.bodycam.frontend.nav.NAV
 import com.jewer.bodycam.ui.theme.DarkYellow
 import com.jewer.bodycam.ui.theme.Gray
+import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
 
 @Composable
@@ -73,14 +82,19 @@ fun SettingScreen(
     val context = LocalContext.current
     val userName = remember { mutableStateOf(getUserName(context)) }
     val reName = remember { mutableStateOf(false) }
+    val instructionAlertDialogIsVisible = remember { mutableStateOf(false) }
     var timeIntervalExpand by remember { mutableStateOf(false) }
     var volumeExpand by remember { mutableStateOf(false) }
     var brandExpand by remember { mutableStateOf(false) }
+    var orientationExpand by remember { mutableStateOf(false) }
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
     val isFlashlightChecked = remember { mutableStateOf(getFlashlightStatus(context)) }
     val isKeyRecordingChecked = remember { mutableStateOf(getKeyRecordingStatus(context)) }
+    val isBodyDetectionChecked = remember { mutableStateOf(getBodyDetectionStatus(context)) }
+    val isSimulatedWideAngleChecked = remember { mutableStateOf(getSimulatedWideAngleStatus(context)) }
+    val chosenOrientationMode = remember { mutableIntStateOf(getOrientationMode(context)) }
     val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
 
     val playFeedback = {
@@ -109,23 +123,26 @@ fun SettingScreen(
     data class VolumeOption(val displayText: String, val percent: Int)
     val volumeOptions = listOf(
         VolumeOption("High", 100),
-        VolumeOption("Medium", 60),
+        VolumeOption("Medium", 50),
         VolumeOption("Low", 30)
     )
     val initialVolume = remember {
         volumeOptions.find { it.percent == getBeepVolume(context) }
-            ?: volumeOptions.find { it.percent == 100 }!!
+            ?: volumeOptions.find { it.percent == 50 }!!
     }
     var chosenVolume by remember { mutableStateOf(initialVolume) }
 
     val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
-    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked, isKeyRecordingChecked) {
+    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked, isKeyRecordingChecked, isBodyDetectionChecked, chosenOrientationMode.intValue, isSimulatedWideAngleChecked.value) {
         updateUserName(context, userName.value)
         updateVibrateStatus(context, isVibrateChecked.value)
         updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
         updateFlashlightStatus(context, isFlashlightChecked.value)
         updateKeyRecordingStatus(context, isKeyRecordingChecked.value)
+        updateBodyDetectionStatus(context, isBodyDetectionChecked.value)
+        updateOrientationMode(context, chosenOrientationMode.intValue)
+        updateSimulatedWideAngleStatus(context, isSimulatedWideAngleChecked.value)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -223,7 +240,41 @@ fun SettingScreen(
                     }
                 }
 
-                // 音量鍵錄影
+                // 人體辨識
+                TextButton(onClick = {
+                    isBodyDetectionChecked.value = !isBodyDetectionChecked.value
+                    updateBodyDetectionStatus(context, isBodyDetectionChecked.value)
+                    if (isBodyDetectionChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Human Body Detection", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isBodyDetectionChecked.value, onCheckedChange = {
+                            isBodyDetectionChecked.value = it
+                            updateBodyDetectionStatus(context, it)
+                            if (isBodyDetectionChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 模擬廣角 (魚眼濾鏡)
+                TextButton(onClick = {
+                    isSimulatedWideAngleChecked.value = !isSimulatedWideAngleChecked.value
+                    updateSimulatedWideAngleStatus(context, isSimulatedWideAngleChecked.value)
+                    if (isSimulatedWideAngleChecked.value) playFeedback()
+                }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Fisheye Mode", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Switch(checked = isSimulatedWideAngleChecked.value, onCheckedChange = {
+                            isSimulatedWideAngleChecked.value = it
+                            updateSimulatedWideAngleStatus(context, it)
+                            if (isSimulatedWideAngleChecked.value) playFeedback()
+                        },
+                            colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 音量鍵錄錄影
                 TextButton(onClick = {
                     isKeyRecordingChecked.value = !isKeyRecordingChecked.value
                     updateKeyRecordingStatus(context, isKeyRecordingChecked.value)
@@ -237,6 +288,28 @@ fun SettingScreen(
                             if (isKeyRecordingChecked.value) playFeedback()
                         },
                             colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 顯示方向模式選擇
+                TextButton(onClick = { orientationExpand = !orientationExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Display Orientation", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = if (chosenOrientationMode.intValue == 1) "Portrait" else "Landscape", color = DarkYellow)
+                        DropdownMenu(expanded = orientationExpand, onDismissRequest = { orientationExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            DropdownMenuItem(text = { Text(text = "Landscape", color = White) }, onClick = {
+                                chosenOrientationMode.intValue = 0
+                                updateOrientationMode(context, 0)
+                                playFeedback()
+                                orientationExpand = false
+                            })
+                            DropdownMenuItem(text = { Text(text = "Portrait", color = White) }, onClick = {
+                                chosenOrientationMode.intValue = 1
+                                updateOrientationMode(context, 1)
+                                playFeedback()
+                                orientationExpand = false
+                            })
+                        }
                     }
                 }
 
@@ -261,7 +334,7 @@ fun SettingScreen(
                 // 嗶聲音量選擇
                 TextButton(onClick = { volumeExpand = !volumeExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "Beep Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = "System Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
                         Text(text = chosenVolume.displayText, color = DarkYellow)
                         DropdownMenu(expanded = volumeExpand, onDismissRequest = { volumeExpand = false }, modifier = Modifier.border(1.dp, White)) {
                             volumeOptions.forEach { volumeOption ->
@@ -293,6 +366,11 @@ fun SettingScreen(
                         }
                     }
                 }
+
+                // 說明書對話框開關
+                TextButton(onClick = { instructionAlertDialogIsVisible.value = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Text(text = "Instruction", textAlign = TextAlign.Center, modifier = Modifier.weight(1f), color = Red)
+                }
             }
         }
     }
@@ -320,6 +398,36 @@ fun SettingScreen(
                     Text(text = "confirm")
                 }
             }
+        )
+    }
+
+    // 說明書對話框
+    if (instructionAlertDialogIsVisible.value) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(text = "Instruction", color = White) },
+            text = { Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                SelectionContainer {
+                    Text(
+                        text =  "●  AXON : Tap top right \u201CAXON\u201D icon to start/stop recording.\n\n" +
+                                "●  MOTOROLA : Tap top left \u201CMOTOROLA\u201D icon to start/stop recording.\n\n" +
+                                "●  TRANSCEND : Tap bottom left \u201CTRANSCEND\u201D icon to start/stop recording.\n\n" +
+                                "●  GETAC : Tap top left \u201CGETAC\u201D icon to start/stop recording.\n\n" +
+                                "●  DOZOR : Tap top right \u201CDOZOR\u201D icon to start/stop recording.\n\n" +
+                                "●  PANASONIC : Tap top right \u201CPANASONIC\u201D icon to start/stop recording.\n\n" +
+                                "●  Record result will be stored in \u201CBodycam\u201D folder in device media store space.\n\n" +
+                                "●  For android 14+ device, you can chose to record \u201CA single app\u201D or \u201CEntire screen\u201D.\n\n" +
+                                "●  Tap the screen then \u201Csettings\u201D 、 \u201Cradio system\u201D 、\u201Ccamera change\u201D and \u201Cmedia storage\u201D buttom will show on the screen.\n\n" +
+                                "●  If you want to use radio system, push the radio buttom on all of your devices then wait for connection, there will be online devices number on the top of the buttom when connected.\n\n" +
+                                "●  You can change the orientation of your device in settings.\n\n" +
+                                "●  Not every device have wide lens, \u201CBodycam\u201D will search wide lens on your device automatically, or you can use \u201Cfisheye mode\u201D instead.\n\n" +
+                                "●  User name can be changed.",
+                        color = White
+                    )
+                }
+            }
+            },
+            confirmButton = { TextButton(onClick = { instructionAlertDialogIsVisible.value = false }) { Text(color = DarkYellow, text = "close") } },
         )
     }
 }
