@@ -15,8 +15,8 @@ configure<ApplicationExtension> {
         applicationId = "com.jewer.bodycam"
         minSdk = 26
         targetSdk = 37
-        versionCode = 50
-        versionName = "1.1.50"
+        versionCode = 54
+        versionName = "1.1.54"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -83,6 +83,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.play.services.nearby)
+    implementation(libs.google.play.app.update)
+    implementation(libs.google.play.app.update.ktx)
     implementation(libs.mlkit.pose.accurate)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)

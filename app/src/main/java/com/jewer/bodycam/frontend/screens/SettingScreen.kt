@@ -1,5 +1,11 @@
 package com.jewer.bodycam.frontend.screens
 
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.os.Build
+import android.util.Log
+import androidx.annotation.OptIn
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +47,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.getSystemService
 import androidx.navigation.NavController
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
@@ -51,6 +58,8 @@ import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.getOrientationMode
+import com.jewer.bodycam.backend.functions.getSelectedBackCameraId
+import com.jewer.bodycam.backend.functions.getSelectedFrontCameraId
 import com.jewer.bodycam.backend.functions.getSimulatedWideAngleStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
@@ -64,6 +73,8 @@ import com.jewer.bodycam.backend.functions.updateFlashlightStatus
 import com.jewer.bodycam.backend.functions.updateKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.updateOrientationMode
+import com.jewer.bodycam.backend.functions.updateSelectedBackCameraId
+import com.jewer.bodycam.backend.functions.updateSelectedFrontCameraId
 import com.jewer.bodycam.backend.functions.updateSimulatedWideAngleStatus
 import com.jewer.bodycam.backend.functions.updateUserName
 import com.jewer.bodycam.backend.functions.updateVibrateAndBeepTimeInterval
@@ -74,7 +85,11 @@ import com.jewer.bodycam.ui.theme.DarkYellow
 import com.jewer.bodycam.ui.theme.Gray
 import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
+import java.util.Locale
 
+data class CameraOption(val id: String, val displayName: String)
+
+@OptIn(ExperimentalCamera2Interop::class)
 @Composable
 fun SettingScreen(
     navController: NavController
@@ -87,6 +102,9 @@ fun SettingScreen(
     var volumeExpand by remember { mutableStateOf(false) }
     var brandExpand by remember { mutableStateOf(false) }
     var orientationExpand by remember { mutableStateOf(false) }
+    var backCameraExpand by remember { mutableStateOf(false) }
+    var frontCameraExpand by remember { mutableStateOf(false) }
+    
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
@@ -96,6 +114,54 @@ fun SettingScreen(
     val isSimulatedWideAngleChecked = remember { mutableStateOf(getSimulatedWideAngleStatus(context)) }
     val chosenOrientationMode = remember { mutableIntStateOf(getOrientationMode(context)) }
     val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
+
+    // ── 相機選擇相關 ──
+    var availableBackCameras by remember { mutableStateOf(emptyList<CameraOption>()) }
+    var availableFrontCameras by remember { mutableStateOf(emptyList<CameraOption>()) }
+    var selectedBackCameraId by remember { mutableStateOf(getSelectedBackCameraId(context)) }
+    var selectedFrontCameraId by remember { mutableStateOf(getSelectedFrontCameraId(context)) }
+
+    LaunchedEffect(Unit) {
+        val cameraManager = context.getSystemService<CameraManager>() ?: return@LaunchedEffect
+        val backCameras = mutableListOf<CameraOption>()
+        val frontCameras = mutableListOf<CameraOption>()
+
+        try {
+            cameraManager.cameraIdList.forEach { logicalId ->
+                val chars = cameraManager.getCameraCharacteristics(logicalId)
+                val facing = chars.get(CameraCharacteristics.LENS_FACING)
+                
+                // 1. 先加入邏輯鏡頭本身
+                addCameraOption(cameraManager, logicalId, facing, backCameras, frontCameras)
+
+                // 2. 深度挖掘：獲取該邏輯鏡頭包含的所有物理鏡頭 (API 28+)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val physicalIds = chars.physicalCameraIds
+                    physicalIds.forEach { physicalId ->
+                        // 避免重複加入
+                        if (physicalId != logicalId) {
+                            addCameraOption(cameraManager, physicalId, facing, backCameras, frontCameras, isPhysical = true)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Settings", "Failed to list cameras", e)
+        }
+
+        availableBackCameras = backCameras
+        availableFrontCameras = frontCameras
+
+        // 初始化預設值
+        if (selectedBackCameraId.isEmpty() && backCameras.isNotEmpty()) {
+            selectedBackCameraId = backCameras.first().id
+            updateSelectedBackCameraId(context, selectedBackCameraId)
+        }
+        if (selectedFrontCameraId.isEmpty() && frontCameras.isNotEmpty()) {
+            selectedFrontCameraId = frontCameras.first().id
+            updateSelectedFrontCameraId(context, selectedFrontCameraId)
+        }
+    }
 
     val playFeedback = {
         if (isBeepSoundChecked.value) playSoundAtMaxVolume(context, R.raw.settingsactivatedsound)
@@ -349,6 +415,44 @@ fun SettingScreen(
                     }
                 }
 
+                // 前置相機選擇 (下拉選單方式)
+                TextButton(onClick = { frontCameraExpand = !frontCameraExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Front Camera", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        val currentLabel = availableFrontCameras.find { it.id == selectedFrontCameraId }?.displayName ?: "Default"
+                        Text(text = currentLabel, color = DarkYellow)
+                        DropdownMenu(expanded = frontCameraExpand, onDismissRequest = { frontCameraExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            availableFrontCameras.forEach { camera ->
+                                DropdownMenuItem(text = { Text(text = camera.displayName, color = White) }, onClick = {
+                                    selectedFrontCameraId = camera.id
+                                    updateSelectedFrontCameraId(context, camera.id)
+                                    playFeedback()
+                                    frontCameraExpand = false
+                                })
+                            }
+                        }
+                    }
+                }
+
+                // 後置相機選擇 (下拉選單方式)
+                TextButton(onClick = { backCameraExpand = !backCameraExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "Back Camera", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        val currentLabel = availableBackCameras.find { it.id == selectedBackCameraId }?.displayName ?: "Default"
+                        Text(text = currentLabel, color = DarkYellow)
+                        DropdownMenu(expanded = backCameraExpand, onDismissRequest = { backCameraExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            availableBackCameras.forEach { camera ->
+                                DropdownMenuItem(text = { Text(text = camera.displayName, color = White) }, onClick = {
+                                    selectedBackCameraId = camera.id
+                                    updateSelectedBackCameraId(context, camera.id)
+                                    playFeedback()
+                                    backCameraExpand = false
+                                })
+                            }
+                        }
+                    }
+                }
+
                 // 品牌選擇 (下拉選單方式)
                 TextButton(onClick = { brandExpand = !brandExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -420,7 +524,8 @@ fun SettingScreen(
                                 "●  Tap the screen then \u201Csettings\u201D 、 \u201Cradio system\u201D 、\u201Ccamera change\u201D and \u201Cmedia storage\u201D buttom will show on the screen.\n\n" +
                                 "●  If you want to use radio system, push the radio buttom on all of your devices then wait for connection, there will be online devices number on the top of the buttom when connected.\n\n" +
                                 "●  You can change the orientation of your device in settings.\n\n" +
-                                "●  Not every device have wide lens, \u201CBodycam\u201D will search wide lens on your device automatically, or you can use \u201Cfisheye mode\u201D instead.\n\n" +
+                                "●  You can manually select the camera lens in settings.\n\n" +
+                                "●  Pinch the screen to zoom in/out the camera.\n\n" +
                                 "●  User name can be changed.",
                         color = White
                     )
@@ -429,5 +534,34 @@ fun SettingScreen(
             },
             confirmButton = { TextButton(onClick = { instructionAlertDialogIsVisible.value = false }) { Text(color = DarkYellow, text = "close") } },
         )
+    }
+}
+
+// 輔助函式：解析相機資訊並分類
+private fun addCameraOption(
+    manager: CameraManager, 
+    id: String, 
+    facing: Int?, 
+    backList: MutableList<CameraOption>, 
+    frontList: MutableList<CameraOption>,
+    isPhysical: Boolean = false
+) {
+    try {
+        val chars = manager.getCameraCharacteristics(id)
+        val focalLengths = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+        val focalLength = focalLengths?.firstOrNull() ?: 0f
+        val apertures = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
+        val aperture = apertures?.firstOrNull() ?: 0f
+        
+        val typeTag = if (isPhysical) "Phys" else "Log"
+        val infoText = String.format(Locale.US, "[%s] %.0fmm f/%.1f (ID:%s)", typeTag, focalLength, aperture, id)
+
+        val option = CameraOption(id, infoText)
+        when (facing) {
+            CameraCharacteristics.LENS_FACING_BACK -> if (backList.none { it.id == id }) backList.add(option)
+            CameraCharacteristics.LENS_FACING_FRONT -> if (frontList.none { it.id == id }) frontList.add(option)
+        }
+    } catch (e: Exception) {
+        Log.e("Settings", "Error parsing camera $id", e)
     }
 }

@@ -3,8 +3,8 @@
     native <methods>;
 }
 
-# 保持 CameraX 相關類別
--keep class androidx.camera.** { *; }
+# 保持 CameraX 相關類別 (移除過於廣泛的 { *; } 以修復 R8 警告)
+-keep class androidx.camera.** { <init>(...); }
 -dontwarn androidx.camera.**
 
 # 保持 Kotlin 序列化與標籤

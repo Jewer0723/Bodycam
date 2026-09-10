@@ -3,7 +3,6 @@ package com.jewer.bodycam.frontend.screens
 import android.app.Activity
 import android.content.Intent
 import android.graphics.RectF
-import android.hardware.camera2.CameraCharacteristics
 import android.media.projection.MediaProjectionManager
 import android.util.Log
 import androidx.activity.compose.ManagedActivityResultLauncher
@@ -12,6 +11,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
@@ -26,6 +26,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,6 +78,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -94,8 +96,12 @@ import com.jewer.bodycam.backend.functions.getCurrentBatteryLevel
 import com.jewer.bodycam.backend.functions.getCurrentTime
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
+import com.jewer.bodycam.backend.functions.getLastBackZoomRatio
+import com.jewer.bodycam.backend.functions.getLastFrontZoomRatio
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
 import com.jewer.bodycam.backend.functions.getPhoneName
+import com.jewer.bodycam.backend.functions.getSelectedBackCameraId
+import com.jewer.bodycam.backend.functions.getSelectedFrontCameraId
 import com.jewer.bodycam.backend.functions.getSimulatedWideAngleStatus
 import com.jewer.bodycam.backend.functions.getUserName
 import com.jewer.bodycam.backend.functions.getVibrateStatus
@@ -103,6 +109,8 @@ import com.jewer.bodycam.backend.functions.orientationFlow
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
 import com.jewer.bodycam.backend.functions.setScreenBrightness
 import com.jewer.bodycam.backend.functions.updateInstructionAlertDialogStatus
+import com.jewer.bodycam.backend.functions.updateLastBackZoomRatio
+import com.jewer.bodycam.backend.functions.updateLastFrontZoomRatio
 import com.jewer.bodycam.backend.functions.vibrateOnce
 import com.jewer.bodycam.backend.services.RadioService
 import com.jewer.bodycam.backend.services.ScreenRecordConfig
@@ -147,6 +155,8 @@ fun CameraScreen(
     val isFlashlightApproved = remember { getFlashlightStatus(context) }
     val isBodyDetectionApproved = remember { getBodyDetectionStatus(context) }
     val isSimulatedWideAngleApproved = remember { getSimulatedWideAngleStatus(context) }
+    val selectedBackCameraIdSetting = remember { getSelectedBackCameraId(context) }
+    val selectedFrontCameraIdSetting = remember { getSelectedFrontCameraId(context) }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val textShadow = remember { Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 2f) }
@@ -172,6 +182,7 @@ fun CameraScreen(
     var useUltraWide by remember { mutableStateOf(true) }
     val chosenBrand = remember { mutableStateOf(getBodycamBrand(context)) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var activeCamera by remember { mutableStateOf<Camera?>(null) }
 
     // ── OpenGL 廣角濾鏡生命週期管理 ──
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -218,21 +229,15 @@ fun CameraScreen(
         }, ContextCompat.getMainExecutor(context))
     }
 
-    val cameraSelector = remember(lensFacing, useUltraWide) {
+    val cameraSelector = remember(lensFacing, selectedBackCameraIdSetting, selectedFrontCameraIdSetting) {
         CameraSelector.Builder().addCameraFilter { cameraInfos ->
-            val filtered = cameraInfos.filter { it.lensFacing == lensFacing }
-            if (lensFacing == CameraSelector.LENS_FACING_BACK && useUltraWide) {
-                val wideLens = filtered.minByOrNull { cameraInfo ->
-                    val camera2Info = Camera2CameraInfo.from(cameraInfo)
-                    val focalLengths = camera2Info.getCameraCharacteristic(
-                        CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-                    )
-                    focalLengths?.minOrNull() ?: Float.MAX_VALUE
-                }
-                wideLens?.let { listOf(it) } ?: filtered
-            } else {
-                filtered
+            val selectedId = if (lensFacing == CameraSelector.LENS_FACING_BACK) selectedBackCameraIdSetting else selectedFrontCameraIdSetting
+            if (selectedId.isNotEmpty()) {
+                val match = cameraInfos.find { Camera2CameraInfo.from(it).cameraId == selectedId }
+                if (match != null) return@addCameraFilter listOf(match)
             }
+            // 降級方案：如果沒選或找不到，則按方向選擇
+            cameraInfos.filter { it.lensFacing == lensFacing }
         }.build()
     }
 
@@ -266,7 +271,7 @@ fun CameraScreen(
         }
     }
 
-    LaunchedEffect(cameraProvider, cameraSelector, isBodyDetectionApproved, isSimulatedWideAngleApproved, lifecycleOwner) {
+    LaunchedEffect(cameraProvider, cameraSelector, isBodyDetectionApproved, isSimulatedWideAngleApproved, lifecycleOwner, selectedBackCameraIdSetting, selectedFrontCameraIdSetting) {
         val provider = cameraProvider ?: return@LaunchedEffect
         try {
             delay(200.milliseconds)
@@ -324,15 +329,52 @@ fun CameraScreen(
 
             if (lifecycleOwner.lifecycle.currentState >= Lifecycle.State.STARTED) {
                 val camera = provider.bindToLifecycle(lifecycleOwner, cameraSelector, useCaseGroupBuilder.build())
-                if (isFlashlightApproved) camera.cameraControl.enableTorch(true)
+                activeCamera = camera
                 
-                val zoomState = camera.cameraInfo.zoomState.value
-                if (zoomState != null && zoomState.zoomRatio != zoomState.minZoomRatio) {
-                    camera.cameraControl.setZoomRatio(zoomState.minZoomRatio)
-                }
+                if (isFlashlightApproved) camera.cameraControl.enableTorch(true)
             }
         } catch (e: Exception) {
             Log.e("CameraPreview", "Error initializing camera", e)
+        }
+    }
+
+    // ── 處理縮放重置邏輯 (確保每次返回 App 時維持最後一次使用的倍率) ──
+    LaunchedEffect(activeCamera, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                activeCamera?.let { camera ->
+                    val lastRatio = if (lensFacing == CameraSelector.LENS_FACING_BACK) 
+                                        getLastBackZoomRatio(context) else getLastFrontZoomRatio(context)
+                    camera.cameraInfo.zoomState.value?.let { state ->
+                        val targetRatio = if (lastRatio > 0 && lastRatio >= state.minZoomRatio && lastRatio <= state.maxZoomRatio) {
+                            lastRatio
+                        } else {
+                            state.minZoomRatio
+                        }
+                        camera.cameraControl.setZoomRatio(targetRatio)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        
+        // 第一次啟動或相機實例改變時的初始化設置
+        activeCamera?.let { camera ->
+            var retryCount = 0
+            while (camera.cameraInfo.zoomState.value == null && retryCount < 15) {
+                delay(100.milliseconds)
+                retryCount++
+            }
+            val lastRatio = if (lensFacing == CameraSelector.LENS_FACING_BACK) 
+                                getLastBackZoomRatio(context) else getLastFrontZoomRatio(context)
+            camera.cameraInfo.zoomState.value?.let { state ->
+                val targetRatio = if (lastRatio > 0 && lastRatio >= state.minZoomRatio && lastRatio <= state.maxZoomRatio) {
+                    lastRatio
+                } else {
+                    state.minZoomRatio
+                }
+                camera.cameraControl.setZoomRatio(targetRatio)
+            }
         }
     }
 
@@ -380,7 +422,31 @@ fun CameraScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .pointerInput(Unit) {
+            detectTapGestures(onTap = { toolBoxIsVisible = !toolBoxIsVisible })
+        }
+        .pointerInput(lensFacing) {
+            detectTransformGestures { _, _, zoom, _ ->
+                activeCamera?.let { camera ->
+                    val zoomState = camera.cameraInfo.zoomState.value
+                    val currentZoomRatio = zoomState?.zoomRatio ?: 1f
+                    val minZoomRatio = zoomState?.minZoomRatio ?: 1f
+                    val maxZoomRatio = zoomState?.maxZoomRatio ?: 1f
+                    val newZoomRatio = (currentZoomRatio * zoom).coerceIn(minZoomRatio, maxZoomRatio)
+                    camera.cameraControl.setZoomRatio(newZoomRatio)
+                    
+                    // 即時儲存最後手動調整的倍率 (區分前後鏡頭)
+                    if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        updateLastBackZoomRatio(context, newZoomRatio)
+                    } else {
+                        updateLastFrontZoomRatio(context, newZoomRatio)
+                    }
+                }
+            }
+        }
+    ) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
         if (isBodyDetectionApproved) {
@@ -405,17 +471,17 @@ fun CameraScreen(
 
         when (chosenBrand.value) {
             "AXON" -> AxonUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
             "MOTOROLA" -> MotorolaUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
             "TRANSCEND" -> TranscendUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
             "GETAC" -> GetacUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
             "DOZOR" -> DozorUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
             "PANASONIC" -> PanasonicUI(currentTime, currentBatteryLevel, userName, isRecordingRunning, recordIconIsVisible, standByStringIsVisible, toolBoxIsVisible, textShadow, consolasBold, navController, beepSoundApproved, vibrateApproved, lensFacing,
-                onToolBoxToggle = { toolBoxIsVisible = !toolBoxIsVisible }, onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
+                onCameraSwitch = { l, u -> lensFacing = l; useUltraWide = u }, screenRecordLauncher, mediaProjectionManager, isPortrait, isRadioRunning, radioEndpoints, ::toggleRadio)
         }
     }
 
@@ -437,7 +503,8 @@ fun CameraScreen(
                                     "●  Tap the screen then \u201Csettings\u201D 、 \u201Cradio system\u201D 、\u201Ccamera change\u201D and \u201Cmedia storage\u201D buttom will show on the screen.\n\n" +
                                     "●  If you want to use radio system, push the radio buttom on all of your devices then wait for connection, there will be online devices number on the top of the buttom when connected.\n\n" +
                                     "●  You can change the orientation of your device in settings.\n\n" +
-                                    "●  Not every device have wide lens, \u201CBodycam\u201D will search wide lens on your device automatically.\n\n" +
+                                    "●  You can manually select the camera lens in settings.\n\n" +
+                                    "●  Pinch the screen to zoom in/out the camera.\n\n" +
                                     "●  User name can be changed.",
                             color = White
                         )
@@ -452,12 +519,12 @@ fun CameraScreen(
 
 @Composable
 fun AxonUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-           onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+           onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val batteryTextSize = if (isPortrait) 14.sp else 17.5.sp
     val watermarkTextSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.align(Alignment.TopEnd), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
             Text(text = "$userName ${currentTime.value}\n${getPhoneName()}", lineHeight = watermarkTextSize.value.sp, color = White, style = MaterialTheme.typography.bodyLarge.copy(shadow = textShadow), fontFamily = consolasBold, fontSize = watermarkTextSize, modifier = Modifier.graphicsLayer { scaleX = 0.95f })
             IconButton(modifier = Modifier.size(brandIconSize), onClick = {
@@ -499,11 +566,11 @@ fun AxonUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntSta
 
 @Composable
 fun MotorolaUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-               onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+               onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val fontSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxWidth().height(if (isPortrait) 30.dp else 40.dp).background(Color.Black.copy(alpha = 0.5f)).align(Alignment.TopCenter)) {
             Column(modifier = Modifier.align(Alignment.TopStart)) {
                 IconButton(modifier = Modifier.size(brandIconSize), onClick = {
@@ -552,11 +619,11 @@ fun MotorolaUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIn
 
 @Composable
 fun TranscendUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-                onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+                onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val fontSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.align(Alignment.BottomStart), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
             IconButton(modifier = Modifier.size(brandIconSize), onClick = {
                 if (isRecordingRunning) {
@@ -595,11 +662,11 @@ fun TranscendUI(currentTime: MutableState<String>, currentBatteryLevel: MutableI
 
 @Composable
 fun GetacUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-            onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+            onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val fontSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.padding(top = 20.dp).fillMaxWidth().height(if (isPortrait) 30.dp else 40.dp).background(Color.Black.copy(alpha = 0.5f)).align(Alignment.TopCenter)) {
             Column(modifier = Modifier.align(Alignment.TopStart).padding(start = if (isPortrait) 15.dp else 30.dp)) {
                 IconButton(modifier = Modifier.size(brandIconSize).scale(if (isPortrait) 1.5f else 2.0f), onClick = {
@@ -644,11 +711,11 @@ fun GetacUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntSt
 
 @Composable
 fun DozorUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-            onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+            onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val fontSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopEnd).padding(end = if (isPortrait) 15.dp else 30.dp).scale(if (isPortrait) 1.2f else 1.5f)) {
             IconButton(modifier = Modifier.size(brandIconSize), onClick = {
                 if (isRecordingRunning) {
@@ -692,11 +759,11 @@ fun DozorUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntSt
 
 @Composable
 fun PanasonicUI(currentTime: MutableState<String>, currentBatteryLevel: MutableIntState, userName: String, isRecordingRunning: Boolean, recordIconIsVisible: Boolean, standByStringIsVisible: Boolean, toolBoxIsVisible: Boolean, textShadow: Shadow, consolasBold: FontFamily, navController: NavHostController, beepSoundApproved: Boolean, vibrateApproved: Boolean, lensFacing: Int,
-                onToolBoxToggle: () -> Unit, onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
+                onCameraSwitch: (Int, Boolean) -> Unit, screenRecordLauncher: ManagedActivityResultLauncher<Intent, ActivityResult>, mediaProjectionManager: MediaProjectionManager, isPortrait: Boolean, isRadioRunning: Boolean, radioEndpoints: Set<String>, toggleRadio: () -> Unit) {
     val context = LocalContext.current
     val brandIconSize = if (isPortrait) 64.dp else 96.dp
     val fontSize = if (isPortrait) 14.sp else 17.5.sp
-    Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onToolBoxToggle() }) }) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 20.dp)) {
             Text(text = "${currentTime.value}\n${userName} ${getPhoneName()}", color = White, style = MaterialTheme.typography.bodyLarge.copy(shadow = textShadow), lineHeight = fontSize.value.sp, fontFamily = consolasBold, fontSize = fontSize, modifier = Modifier.graphicsLayer { scaleX = 0.95f })
         }

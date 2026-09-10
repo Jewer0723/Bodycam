@@ -244,3 +244,63 @@ fun getSimulatedWideAngleStatus(context: Context): Boolean {
 }
 
 /******************************************************************************************************************/
+
+// 更新選擇的後置相機 ID
+fun updateSelectedBackCameraId(context: Context, cameraId: String) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putString("selectedBackCameraId", cameraId)
+    }
+}
+
+// 讀取選擇的後置相機 ID
+fun getSelectedBackCameraId(context: Context): String {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getString("selectedBackCameraId", "") ?: ""
+}
+
+// 更新選擇的前置相機 ID
+fun updateSelectedFrontCameraId(context: Context, cameraId: String) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putString("selectedFrontCameraId", cameraId)
+    }
+}
+
+// 讀取選擇的前置相機 ID
+fun getSelectedFrontCameraId(context: Context): String {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getString("selectedFrontCameraId", "") ?: ""
+}
+
+/******************************************************************************************************************/
+
+// 更新最後後置縮放倍率
+fun updateLastBackZoomRatio(context: Context, ratio: Float) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putFloat("lastBackZoomRatio", ratio)
+    }
+}
+
+// 讀取最後後置縮放倍率
+fun getLastBackZoomRatio(context: Context): Float {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getFloat("lastBackZoomRatio", -1f)
+}
+
+// 更新最後前置縮放倍率
+fun updateLastFrontZoomRatio(context: Context, ratio: Float) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putFloat("lastFrontZoomRatio", ratio)
+    }
+}
+
+// 讀取最後前置縮放倍率
+fun getLastFrontZoomRatio(context: Context): Float {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getFloat("lastFrontZoomRatio", -1f)
+}
+
+/******************************************************************************************************************/
