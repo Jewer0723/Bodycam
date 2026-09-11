@@ -52,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,6 +95,8 @@ import com.jewer.bodycam.backend.functions.getBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
 import com.jewer.bodycam.backend.functions.getCurrentBatteryLevel
 import com.jewer.bodycam.backend.functions.getCurrentTime
+import com.jewer.bodycam.backend.functions.getFisheyeK
+import com.jewer.bodycam.backend.functions.getFisheyeScale
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getInstructionAlertDialogStatus
 import com.jewer.bodycam.backend.functions.getLastBackZoomRatio
@@ -153,10 +156,13 @@ fun CameraScreen(
     val instructionAlertDialogApproved = remember { getInstructionAlertDialogStatus(context) }
     val isLowBrightnessApproved = remember { getLowBrightnessStatus(context) }
     val isFlashlightApproved = remember { getFlashlightStatus(context) }
-    val isBodyDetectionApproved = remember { getBodyDetectionStatus(context) }
-    val isSimulatedWideAngleApproved = remember { getSimulatedWideAngleStatus(context) }
-    val selectedBackCameraIdSetting = remember { getSelectedBackCameraId(context) }
-    val selectedFrontCameraIdSetting = remember { getSelectedFrontCameraId(context) }
+    
+    var isBodyDetectionApproved by remember { mutableStateOf(getBodyDetectionStatus(context)) }
+    var isSimulatedWideAngleApproved by remember { mutableStateOf(getSimulatedWideAngleStatus(context)) }
+    var fisheyeK by remember { mutableFloatStateOf(getFisheyeK(context)) }
+    var fisheyeScale by remember { mutableFloatStateOf(getFisheyeScale(context)) }
+    var selectedBackCameraIdSetting by remember { mutableStateOf(getSelectedBackCameraId(context)) }
+    var selectedFrontCameraIdSetting by remember { mutableStateOf(getSelectedFrontCameraId(context)) }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val textShadow = remember { Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 2f) }
@@ -186,13 +192,13 @@ fun CameraScreen(
 
     // ── OpenGL 廣角濾鏡生命週期管理 ──
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-    val wideAngleEffect = remember(isSimulatedWideAngleApproved, lensFacing, isPortrait) {
+    val wideAngleEffect = remember(isSimulatedWideAngleApproved, lensFacing, isPortrait, fisheyeK, fisheyeScale) {
         if (isSimulatedWideAngleApproved) {
             val isFront = lensFacing == CameraSelector.LENS_FACING_FRONT
             CustomCameraEffect(
                 CameraEffect.PREVIEW,
                 cameraExecutor,
-                WideAngleSurfaceProcessor(isPortrait, isFront)
+                WideAngleSurfaceProcessor(isPortrait, isFront, fisheyeK, fisheyeScale)
             ) { Log.e("WideAngle", "Effect error", it) }
         } else null
     }
@@ -268,6 +274,13 @@ fun CameraScreen(
     LaunchedEffect(navController) {
         navController.currentBackStackEntryFlow.collect {
             chosenBrand.value = getBodycamBrand(context)
+            // 同步刷新所有設定值
+            isBodyDetectionApproved = getBodyDetectionStatus(context)
+            isSimulatedWideAngleApproved = getSimulatedWideAngleStatus(context)
+            fisheyeK = getFisheyeK(context)
+            fisheyeScale = getFisheyeScale(context)
+            selectedBackCameraIdSetting = getSelectedBackCameraId(context)
+            selectedFrontCameraIdSetting = getSelectedFrontCameraId(context)
         }
     }
 

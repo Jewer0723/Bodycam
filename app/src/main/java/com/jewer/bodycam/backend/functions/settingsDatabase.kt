@@ -304,3 +304,33 @@ fun getLastFrontZoomRatio(context: Context): Float {
 }
 
 /******************************************************************************************************************/
+
+// 更新魚眼 K 值
+fun updateFisheyeK(context: Context, k: Float) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putFloat("fisheyeK", k)
+    }
+}
+
+// 讀取魚眼 K 值 (預設 0.45)
+fun getFisheyeK(context: Context): Float {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getFloat("fisheyeK", 0.45f)
+}
+
+// 更新魚眼縮放值 (原 distortedPos 係數)
+fun updateFisheyeScale(context: Context, scale: Float) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putFloat("fisheyeScale", scale)
+    }
+}
+
+// 讀取魚眼縮放值 (預設 0.6)
+fun getFisheyeScale(context: Context): Float {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getFloat("fisheyeScale", 0.6f)
+}
+
+/******************************************************************************************************************/

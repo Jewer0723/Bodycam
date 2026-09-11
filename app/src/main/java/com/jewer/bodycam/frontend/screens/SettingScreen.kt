@@ -27,6 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -34,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +57,8 @@ import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBeepVolume
 import com.jewer.bodycam.backend.functions.getBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getFisheyeK
+import com.jewer.bodycam.backend.functions.getFisheyeScale
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
 import com.jewer.bodycam.backend.functions.getKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.getLowBrightnessStatus
@@ -69,6 +74,8 @@ import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
+import com.jewer.bodycam.backend.functions.updateFisheyeK
+import com.jewer.bodycam.backend.functions.updateFisheyeScale
 import com.jewer.bodycam.backend.functions.updateFlashlightStatus
 import com.jewer.bodycam.backend.functions.updateKeyRecordingStatus
 import com.jewer.bodycam.backend.functions.updateLowBrightnessStatus
@@ -112,6 +119,8 @@ fun SettingScreen(
     val isKeyRecordingChecked = remember { mutableStateOf(getKeyRecordingStatus(context)) }
     val isBodyDetectionChecked = remember { mutableStateOf(getBodyDetectionStatus(context)) }
     val isSimulatedWideAngleChecked = remember { mutableStateOf(getSimulatedWideAngleStatus(context)) }
+    var fisheyeK by remember { mutableFloatStateOf(getFisheyeK(context)) }
+    var fisheyeScale by remember { mutableFloatStateOf(getFisheyeScale(context)) }
     val chosenOrientationMode = remember { mutableIntStateOf(getOrientationMode(context)) }
     val chosenBrandState = remember { mutableStateOf(getBodycamBrand(context)) }
 
@@ -200,7 +209,7 @@ fun SettingScreen(
 
     val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
-    LaunchedEffect(userName, isVibrateChecked, isLowBrightnessChecked, isFlashlightChecked, isKeyRecordingChecked, isBodyDetectionChecked, chosenOrientationMode.intValue, isSimulatedWideAngleChecked.value) {
+    LaunchedEffect(userName.value, isVibrateChecked.value, isLowBrightnessChecked.value, isFlashlightChecked.value, isKeyRecordingChecked.value, isBodyDetectionChecked.value, chosenOrientationMode.intValue, isSimulatedWideAngleChecked.value, fisheyeK, fisheyeScale) {
         updateUserName(context, userName.value)
         updateVibrateStatus(context, isVibrateChecked.value)
         updateLowBrightnessStatus(context, isLowBrightnessChecked.value)
@@ -209,6 +218,8 @@ fun SettingScreen(
         updateBodyDetectionStatus(context, isBodyDetectionChecked.value)
         updateOrientationMode(context, chosenOrientationMode.intValue)
         updateSimulatedWideAngleStatus(context, isSimulatedWideAngleChecked.value)
+        updateFisheyeK(context, fisheyeK)
+        updateFisheyeScale(context, fisheyeScale)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -337,6 +348,35 @@ fun SettingScreen(
                             if (isSimulatedWideAngleChecked.value) playFeedback()
                         },
                             colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 魚眼 K 值調整 (僅在開啟魚眼時顯示)
+                if (isSimulatedWideAngleChecked.value) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Fisheye Strength (K): ", color = White, fontSize = 14.sp)
+                            Text(text = String.format(Locale.US, "%.2f", fisheyeK), color = DarkYellow, fontSize = 14.sp)
+                        }
+                        Slider(
+                            value = fisheyeK,
+                            onValueChange = { fisheyeK = it },
+                            valueRange = 0f..1f,
+                            colors = SliderDefaults.colors(thumbColor = DarkYellow, activeTrackColor = DarkYellow)
+                        )
+                    }
+
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Fisheye Scale: ", color = White, fontSize = 14.sp)
+                            Text(text = String.format(Locale.US, "%.2f", fisheyeScale), color = DarkYellow, fontSize = 14.sp)
+                        }
+                        Slider(
+                            value = fisheyeScale,
+                            onValueChange = { fisheyeScale = it },
+                            valueRange = 0f..1f,
+                            colors = SliderDefaults.colors(thumbColor = DarkYellow, activeTrackColor = DarkYellow)
+                        )
                     }
                 }
 

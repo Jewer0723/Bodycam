@@ -26,7 +26,12 @@ class CustomCameraEffect(
     errorListener: Consumer<Throwable>
 ) : CameraEffect(targets, executor, processor, errorListener)
 
-class WideAngleSurfaceProcessor(private val isPortrait: Boolean, private val isFrontCamera: Boolean) : SurfaceProcessor {
+class WideAngleSurfaceProcessor(
+    private val isPortrait: Boolean, 
+    private val isFrontCamera: Boolean,
+    private val fisheyeK: Float,
+    private val fisheyeScale: Float
+) : SurfaceProcessor {
     private val glThread = HandlerThread("GLThread").apply { start() }
     private val handler = Handler(glThread.looper)
     
@@ -87,14 +92,15 @@ class WideAngleSurfaceProcessor(private val isPortrait: Boolean, private val isF
         precision mediump float;
         varying vec2 vTexCoord;
         uniform samplerExternalOES sTexture;
+        uniform float uK;
+        uniform float uScale;
 
         void main() {
             vec2 uv = vTexCoord;
             vec2 pos = (uv - 0.5) * 2.0;
-            float k = 0.45; 
             float r2 = pos.x * pos.x + pos.y * pos.y;
-            vec2 distortedPos = pos * (1.0 + k * r2);
-            distortedPos *= 0.6;
+            vec2 distortedPos = pos * (1.0 + uK * r2);
+            distortedPos *= uScale;
             vec2 sampleUv = (distortedPos / 2.0) + 0.5;
             
             if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) {
@@ -188,6 +194,12 @@ class WideAngleSurfaceProcessor(private val isPortrait: Boolean, private val isF
         GLES20.glUseProgram(program)
         val matrixHandle = GLES20.glGetUniformLocation(program, "uTexMatrix")
         GLES20.glUniformMatrix4fv(matrixHandle, 1, false, texMatrix, 0)
+
+        // 設定魚眼參數 Uniforms
+        val kHandle = GLES20.glGetUniformLocation(program, "uK")
+        GLES20.glUniform1f(kHandle, fisheyeK)
+        val scaleHandle = GLES20.glGetUniformLocation(program, "uScale")
+        GLES20.glUniform1f(scaleHandle, fisheyeScale)
 
         vertexData.position(0)
         val posHandle = GLES20.glGetAttribLocation(program, "aPosition")
