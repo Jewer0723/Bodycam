@@ -51,6 +51,10 @@ fun PermissionScreen() {
                 add(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+            }
+
             // Nearby Connections (Radio) 必備：位置權限
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -75,7 +79,34 @@ fun PermissionScreen() {
         permissionState.launchMultiplePermissionRequest()
     }
     
-    val allGranted = permissionState.permissions.all { it.status.isGranted }
+    val hasMediaPermission = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+            permissionState.permissions.any {
+                (it.permission == Manifest.permission.READ_MEDIA_VIDEO ||
+                 it.permission == Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) && it.status.isGranted
+            }
+        }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+            permissionState.permissions.any {
+                it.permission == Manifest.permission.READ_MEDIA_VIDEO && it.status.isGranted
+            }
+        }
+        else -> {
+            permissionState.permissions.any {
+                it.permission == Manifest.permission.READ_EXTERNAL_STORAGE && it.status.isGranted
+            }
+        }
+    }
+
+    val otherPermissionsGranted = permissionState.permissions
+        .filter {
+            it.permission != "android.permission.READ_MEDIA_VIDEO" &&
+            it.permission != "android.permission.READ_MEDIA_VISUAL_USER_SELECTED" &&
+            it.permission != Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        .all { it.status.isGranted }
+
+    val allGranted = hasMediaPermission && otherPermissionsGranted
 
     if (!allGranted) {
         BodycamTheme {
@@ -96,7 +127,14 @@ fun PermissionScreen() {
                 Button(
                     onClick = {
                         val permanentlyDenied = permissionState.permissions.any { permission ->
-                            !permission.status.isGranted && !permission.status.shouldShowRationale
+                            val isMedia = permission.permission == "android.permission.READ_MEDIA_VIDEO" ||
+                                          permission.permission == "android.permission.READ_MEDIA_VISUAL_USER_SELECTED" ||
+                                          permission.permission == Manifest.permission.READ_EXTERNAL_STORAGE
+                            if (isMedia) {
+                                !hasMediaPermission && !permission.status.shouldShowRationale
+                            } else {
+                                !permission.status.isGranted && !permission.status.shouldShowRationale
+                            }
                         }
 
                         if (permanentlyDenied) {

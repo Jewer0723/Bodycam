@@ -7,6 +7,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
@@ -106,7 +107,15 @@ class RadioService : Service() {
         if (getVibrateStatus(this)) vibrateOnce(this, 500)
 
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification("Searching for devices..."))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Searching for devices..."),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification("Searching for devices..."))
+        }
         
         isRadioRunning.value = true
         isRadioSearching.value = true
