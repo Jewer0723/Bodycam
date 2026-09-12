@@ -25,6 +25,7 @@ import com.jewer.bodycam.MainActivity
 import com.jewer.bodycam.R
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getCameraFps
 import com.jewer.bodycam.backend.functions.getVibrateAndBeepTimeInterval
 import com.jewer.bodycam.backend.functions.getVibrateStatus
 import com.jewer.bodycam.backend.functions.playSoundAtMaxVolume
@@ -268,7 +269,8 @@ class ScreenRecordService: Service() {
                 setAudioEncodingBitRate(128000)
                 setAudioChannels(1)
                 setVideoEncodingBitRate(6 * 1024 * 1024)
-                setVideoFrameRate(30)
+                val userFps = getCameraFps(applicationContext)
+                setVideoFrameRate(if (userFps > 0) userFps else 30)
                 prepare()
             }
             true

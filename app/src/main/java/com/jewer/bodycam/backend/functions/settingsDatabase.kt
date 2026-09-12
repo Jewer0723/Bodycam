@@ -96,10 +96,10 @@ fun updateBeepVolume(context: Context, volume: Int) {
     }
 }
 
-// 讀取音量百分比 (預設 50)
+// 讀取音量百分比 (預設 30)
 fun getBeepVolume(context: Context): Int {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-    return sharedPreferences.getInt("beepVolume", 50)
+    return sharedPreferences.getInt("beepVolume", 30)
 }
 
 /******************************************************************************************************************/
@@ -331,6 +331,22 @@ fun updateFisheyeScale(context: Context, scale: Float) {
 fun getFisheyeScale(context: Context): Float {
     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     return sharedPreferences.getFloat("fisheyeScale", 0.6f)
+}
+
+/******************************************************************************************************************/
+
+// 更新相機影格率 (FPS)
+fun updateCameraFps(context: Context, fps: Int) {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    sharedPreferences.edit {
+        putInt("cameraFps", fps)
+    }
+}
+
+// 讀取相機影格率 (FPS, 預設 30)
+fun getCameraFps(context: Context): Int {
+    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    return sharedPreferences.getInt("cameraFps", 30)
 }
 
 /******************************************************************************************************************/

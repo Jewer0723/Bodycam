@@ -57,6 +57,7 @@ import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBeepVolume
 import com.jewer.bodycam.backend.functions.getBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getCameraFps
 import com.jewer.bodycam.backend.functions.getFisheyeK
 import com.jewer.bodycam.backend.functions.getFisheyeScale
 import com.jewer.bodycam.backend.functions.getFlashlightStatus
@@ -74,6 +75,7 @@ import com.jewer.bodycam.backend.functions.updateBeepSoundStatus
 import com.jewer.bodycam.backend.functions.updateBeepVolume
 import com.jewer.bodycam.backend.functions.updateBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.updateBodycamBrand
+import com.jewer.bodycam.backend.functions.updateCameraFps
 import com.jewer.bodycam.backend.functions.updateFisheyeK
 import com.jewer.bodycam.backend.functions.updateFisheyeScale
 import com.jewer.bodycam.backend.functions.updateFlashlightStatus
@@ -93,6 +95,7 @@ import com.jewer.bodycam.ui.theme.Gray
 import com.jewer.bodycam.ui.theme.Red
 import com.jewer.bodycam.ui.theme.White
 import java.util.Locale
+import kotlin.math.roundToInt
 
 data class CameraOption(val id: String, val displayName: String)
 
@@ -106,7 +109,7 @@ fun SettingScreen(
     val reName = remember { mutableStateOf(false) }
     val instructionAlertDialogIsVisible = remember { mutableStateOf(false) }
     var timeIntervalExpand by remember { mutableStateOf(false) }
-    var volumeExpand by remember { mutableStateOf(false) }
+    var fpsExpand by remember { mutableStateOf(false) }
     var brandExpand by remember { mutableStateOf(false) }
     var orientationExpand by remember { mutableStateOf(false) }
     var backCameraExpand by remember { mutableStateOf(false) }
@@ -114,6 +117,7 @@ fun SettingScreen(
     
     val isVibrateChecked = remember { mutableStateOf(getVibrateStatus(context)) }
     val isBeepSoundChecked = remember { mutableStateOf(getBeepSoundStatus(context)) }
+    var beepVolume by remember { mutableIntStateOf(getBeepVolume(context)) }
     val isLowBrightnessChecked = remember { mutableStateOf(getLowBrightnessStatus(context)) }
     val isFlashlightChecked = remember { mutableStateOf(getFlashlightStatus(context)) }
     val isKeyRecordingChecked = remember { mutableStateOf(getKeyRecordingStatus(context)) }
@@ -195,17 +199,19 @@ fun SettingScreen(
     }
     var chosenTimeInterval by remember { mutableStateOf(initialInterval) }
 
-    data class VolumeOption(val displayText: String, val percent: Int)
-    val volumeOptions = listOf(
-        VolumeOption("High", 100),
-        VolumeOption("Medium", 50),
-        VolumeOption("Low", 30)
+    data class FpsOption(val displayText: String, val fps: Int)
+    val fpsOptions = listOf(
+        FpsOption("Auto", 0),
+        FpsOption("15 FPS", 15),
+        FpsOption("24 FPS", 24),
+        FpsOption("30 FPS", 30),
+        FpsOption("60 FPS", 60)
     )
-    val initialVolume = remember {
-        volumeOptions.find { it.percent == getBeepVolume(context) }
-            ?: volumeOptions.find { it.percent == 50 }!!
+    val initialFpsOption = remember {
+        fpsOptions.find { it.fps == getCameraFps(context) }
+            ?: fpsOptions.find { it.fps == 30 }!!
     }
-    var chosenVolume by remember { mutableStateOf(initialVolume) }
+    var chosenFpsOption by remember { mutableStateOf(initialFpsOption) }
 
     val bodycamBrands = listOf("AXON", "MOTOROLA", "TRANSCEND", "GETAC", "DOZOR", "PANASONIC")
 
@@ -280,6 +286,26 @@ fun SettingScreen(
                             if (isBeepSoundChecked.value) playFeedback()
                         },
                             colors = SwitchDefaults.colors(checkedThumbColor = White, uncheckedThumbColor = White, checkedTrackColor = DarkYellow, uncheckedTrackColor = Gray))
+                    }
+                }
+
+                // 嗶聲音量調整 (僅在開啟嗶聲時顯示)
+                if (isBeepSoundChecked.value) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Beep Volume: ", color = White, fontSize = 14.sp)
+                            Text(text = "$beepVolume%", color = DarkYellow, fontSize = 14.sp)
+                        }
+                        Slider(
+                            value = beepVolume.toFloat(),
+                            onValueChange = {
+                                beepVolume = it.roundToInt()
+                                updateBeepVolume(context, beepVolume)
+                            },
+                            valueRange = 0f..100f,
+                            steps = 99,
+                            colors = SliderDefaults.colors(thumbColor = DarkYellow, activeTrackColor = DarkYellow)
+                        )
                     }
                 }
 
@@ -437,23 +463,25 @@ fun SettingScreen(
                     }
                 }
 
-                // 嗶聲音量選擇
-                TextButton(onClick = { volumeExpand = !volumeExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                // 相機影格率 (FPS) 選擇
+                TextButton(onClick = { fpsExpand = !fpsExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "System Volume", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
-                        Text(text = chosenVolume.displayText, color = DarkYellow)
-                        DropdownMenu(expanded = volumeExpand, onDismissRequest = { volumeExpand = false }, modifier = Modifier.border(1.dp, White)) {
-                            volumeOptions.forEach { volumeOption ->
-                                DropdownMenuItem(text = { Text(text = volumeOption.displayText, color = White) }, onClick = {
-                                    chosenVolume = volumeOption
-                                    updateBeepVolume(context, volumeOption.percent)
+                        Text(text = "Camera Frame Rate (FPS)", textAlign = TextAlign.Start, modifier = Modifier.weight(1f), color = White)
+                        Text(text = chosenFpsOption.displayText, color = DarkYellow)
+                        DropdownMenu(expanded = fpsExpand, onDismissRequest = { fpsExpand = false }, modifier = Modifier.border(1.dp, White)) {
+                            fpsOptions.forEach { option ->
+                                DropdownMenuItem(text = { Text(text = option.displayText, color = White) }, onClick = {
+                                    chosenFpsOption = option
+                                    updateCameraFps(context, option.fps)
                                     playFeedback()
-                                    volumeExpand = false
+                                    fpsExpand = false
                                 })
                             }
                         }
                     }
                 }
+
+
 
                 // 前置相機選擇 (下拉選單方式)
                 TextButton(onClick = { frontCameraExpand = !frontCameraExpand }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {

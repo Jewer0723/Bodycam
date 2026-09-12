@@ -3,13 +3,16 @@ package com.jewer.bodycam.frontend.screens
 import android.app.Activity
 import android.content.Intent
 import android.graphics.RectF
+import android.hardware.camera2.CaptureRequest
 import android.media.projection.MediaProjectionManager
 import android.util.Log
+import android.util.Range
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraEffect
@@ -93,6 +96,7 @@ import com.jewer.bodycam.backend.camera.WideAngleSurfaceProcessor
 import com.jewer.bodycam.backend.functions.getBeepSoundStatus
 import com.jewer.bodycam.backend.functions.getBodyDetectionStatus
 import com.jewer.bodycam.backend.functions.getBodycamBrand
+import com.jewer.bodycam.backend.functions.getCameraFps
 import com.jewer.bodycam.backend.functions.getCurrentBatteryLevel
 import com.jewer.bodycam.backend.functions.getCurrentTime
 import com.jewer.bodycam.backend.functions.getFisheyeK
@@ -163,6 +167,7 @@ fun CameraScreen(
     var fisheyeScale by remember { mutableFloatStateOf(getFisheyeScale(context)) }
     var selectedBackCameraIdSetting by remember { mutableStateOf(getSelectedBackCameraId(context)) }
     var selectedFrontCameraIdSetting by remember { mutableStateOf(getSelectedFrontCameraId(context)) }
+    var selectedCameraFpsSetting by remember { mutableIntStateOf(getCameraFps(context)) }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val textShadow = remember { Shadow(color = Black, offset = Offset(3f, 3f), blurRadius = 2f) }
@@ -281,14 +286,23 @@ fun CameraScreen(
             fisheyeScale = getFisheyeScale(context)
             selectedBackCameraIdSetting = getSelectedBackCameraId(context)
             selectedFrontCameraIdSetting = getSelectedFrontCameraId(context)
+            selectedCameraFpsSetting = getCameraFps(context)
         }
     }
 
-    LaunchedEffect(cameraProvider, cameraSelector, isBodyDetectionApproved, isSimulatedWideAngleApproved, lifecycleOwner, selectedBackCameraIdSetting, selectedFrontCameraIdSetting) {
+    LaunchedEffect(cameraProvider, cameraSelector, isBodyDetectionApproved, isSimulatedWideAngleApproved, lifecycleOwner, selectedBackCameraIdSetting, selectedFrontCameraIdSetting, selectedCameraFpsSetting) {
         val provider = cameraProvider ?: return@LaunchedEffect
         try {
             delay(200.milliseconds)
-            val preview = Preview.Builder().build()
+            val previewBuilder = Preview.Builder()
+            if (selectedCameraFpsSetting > 0) {
+                val camera2Extender = Camera2Interop.Extender(previewBuilder)
+                camera2Extender.setCaptureRequestOption(
+                    CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                    Range(selectedCameraFpsSetting, selectedCameraFpsSetting)
+                )
+            }
+            val preview = previewBuilder.build()
             preview.surfaceProvider = previewView.surfaceProvider
             provider.unbindAll()
 
